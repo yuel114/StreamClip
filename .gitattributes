@@ -1,0 +1,3 @@
+# Preserve the upstream license verbatim, including its final blank line.
+licenses/hikami-go-LICENSE -text -whitespace
+LICENSE -text -whitespace

@@ -1,0 +1,9 @@
+# DashScope 云端 ASR 使用 Python 标准库 HTTP，无需安装本地 ASR 模型。
+pyinstaller>=6.0
+# ttkbootstrap 用于现代化UI
+ttkbootstrap>=2.2
+# 完整 Qt Quick 工作台，与原业务服务共用数据。
+PySide6==6.11.2
+# 在本机生成登录二维码，不向第三方服务发送登录链接。
+qrcode==8.2
+# 可选：inaSpeechSegmenter + TensorFlow。建议单独安装到 ina_python 指定的虚拟环境。

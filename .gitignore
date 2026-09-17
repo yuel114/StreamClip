@@ -1,0 +1,62 @@
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*.pyd
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Local runtime data, databases, logs, and credentials
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.db-*
+*.sqlite-*
+*.sqlite3-*
+*.log
+.env
+.env.*
+!.env.example
+*cookies*.txt
+*.pem
+*.key
+
+# Generated media and analysis sidecars
+*.recap.md
+*.silence_map.json
+*.checkpoint.json
+*.analysis-checkpoint.json
+
+# Build and packaging output
+build/
+dist/
+*.spec
+*.exe
+*.dll
+*.zip
+*.mp4
+*.mkv
+*.flv
+*.ts
+*.mp3
+*.wav
+*.srt
+*.ass
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
+.codex/
+.learnings/
+.impeccable/
+
+# Imported reference corpus and third-party assets
+references/

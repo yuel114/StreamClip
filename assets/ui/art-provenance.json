@@ -1,0 +1,182 @@
+{
+  "method": "generated-images-with-offline-derivatives",
+  "new_ai_generation": true,
+  "generation_provenance": "generation-provenance.json",
+  "rebuild": "python -X utf8 -B tools/build_ui_art.py",
+  "assets": [
+    {
+      "file": "wallpaper-studio.png",
+      "usage": [
+        "工作台角色场景壁纸"
+      ],
+      "derived_from": "wallpaper-studio.png",
+      "recipe": "Original generated pixels, unchanged.",
+      "sha256": "6a4dbe93f85fe6d5495ace4636b20666e3e3ad44eca11d9216af5d171a3a34f6",
+      "size": [
+        2048,
+        768
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "wallpaper-sky.png",
+      "usage": [
+        "独立天空壁纸",
+        "页头背景来源"
+      ],
+      "derived_from": "wallpaper-sky.png",
+      "recipe": "Original generated pixels, unchanged.",
+      "sha256": "814e80765431b24c27cb950c954331a0f0db2455ed39396b23b19ce8796a7242",
+      "size": [
+        2048,
+        1152
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "character-sticker.png",
+      "usage": [
+        "顶栏头像",
+        "列表空态"
+      ],
+      "derived_from": "character-sticker.png",
+      "recipe": "Original generated pixels, unchanged.",
+      "sha256": "0d26381209fb68fdca0834225764471d0cf321c956397df38adf65e4670a424e",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "app-icon-source.png",
+      "usage": [
+        "通用视频录制、剪辑与上传图标原图"
+      ],
+      "derived_from": "app-icon-source.png",
+      "recipe": "Original generated pixels, unchanged.",
+      "sha256": "548b2c4c74e4b244dba3b528673fe250d36f107e979ef3e9a57ef63f2342c4e8",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "wallpaper-ice-studio.png",
+      "usage": [
+        "冰蓝蝶影皮肤角色壁纸"
+      ],
+      "derived_from": "wallpaper-ice-studio.png",
+      "recipe": "Original generated pixels, unchanged.",
+      "sha256": "2d71a77be9a3d6d26cf2d08ee3e4387e922c0c044dc097b4a0b1910acfc30ac2",
+      "size": [
+        2048,
+        768
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "wallpaper-ice-sky.png",
+      "usage": [
+        "冰蓝蝶影皮肤蝴蝶纹样页头原图"
+      ],
+      "derived_from": "wallpaper-ice-sky.png",
+      "recipe": "Original generated pixels, unchanged.",
+      "sha256": "28ece43199a1e4a5ef4fbcd1ec0829a6131b7ec33d570b0df2824b805b0d5496",
+      "size": [
+        2048,
+        768
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "wallpaper-orbits.png",
+      "usage": [
+        "七页页头",
+        "导航底部"
+      ],
+      "derived_from": "wallpaper-sky.png",
+      "recipe": "Proportional 1800x300 viewport crop of sky wallpaper, vertical center 0.34; no painted content added.",
+      "sha256": "6b8786b9233ff8925e103d3f075ade52d9e67808e8408af4fa6d2979da261e93",
+      "size": [
+        1800,
+        300
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "wallpaper-ice-header.png",
+      "usage": [
+        "冰蓝蝶影皮肤页头"
+      ],
+      "derived_from": "wallpaper-ice-sky.png",
+      "recipe": "Proportional 1800x300 center crop of the generated butterfly wallpaper; original pixels retained without painted additions.",
+      "sha256": "90cd1ed7624c86ef2c6b61ac460354f52254aa86c825c68e03d72eb8e34bcd97",
+      "size": [
+        1800,
+        300
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "app-icon.png",
+      "usage": [
+        "窗口图标",
+        "侧栏应用标识"
+      ],
+      "derived_from": "app-icon-source.png",
+      "recipe": "Proportional generic video-tool icon resize with rounded application-tile corners; solid background retained.",
+      "sha256": "71d432aef64f6575050d8cb1378fdc0d4c568e9d76eadb0fdce2e9eb6ec72f0f",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA"
+    },
+    {
+      "file": "app-icon.ico",
+      "usage": [
+        "Windows EXE 图标"
+      ],
+      "derived_from": "app-icon-source.png",
+      "recipe": "Seven ICO sizes derived from app-icon.png.",
+      "sha256": "6cb29727533956dd1e3c48b4deeb9b55770de1e5419bd2e76bdc5f6161f75b6d",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "sizes": [
+        [
+          16,
+          16
+        ],
+        [
+          24,
+          24
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          48,
+          48
+        ],
+        [
+          64,
+          64
+        ],
+        [
+          128,
+          128
+        ],
+        [
+          256,
+          256
+        ]
+      ]
+    }
+  ]
+}
