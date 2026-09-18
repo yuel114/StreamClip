@@ -2,13 +2,11 @@
 
 Windows 桌面端 Bilibili 直播切片工作台，使用 Python、PySide6 / Qt Quick 和 FFmpeg。
 
-> 源码使用 GPLv3。当前日夜主题使用无外部参考的 AI 生成素材，旧版第三方角色图片已从当前版本移除；生成记录不代表第三方权利保证。详细来源及说明见 [素材权利说明](assets/ui/ASSET_RIGHTS.md)。
-
 ## 下载
 
 Windows x64 版本见 [GitHub Releases](https://github.com/yuel114/StreamClip/releases/latest)。解压后运行 `StreamClip.exe`，无需安装 Python；FFmpeg、FFprobe 和 yt-dlp 需自行配置，见下方运行要求。
 
-升级前关闭旧程序，将新程序与已有 `data/` 放在同一目录，并保留原媒体工具及配置；不要用空数据目录覆盖已有数据。旧主题偏好会兼容映射到新主题，账号、录播、任务及业务设置沿用。
+升级前关闭旧程序，将新程序与已有 `data/` 放在同一目录，并保留原媒体工具及配置；不要用空数据目录覆盖已有数据。账号、录播、任务及业务设置沿用。
 
 ## 功能
 
@@ -17,16 +15,7 @@ Windows x64 版本见 [GitHub Releases](https://github.com/yuel114/StreamClip/re
 - 管理全局和主播术语表、主播知识库及待审核词条。
 - 使用 FFmpeg 制作字幕、封面和视频切片，在软件内预览成片。
 - 通过 Bilibili 扫码登录，按队列投稿并查询平台处理状态。
-- 两套皮肤、八个工作页面、任务重试、未保存表单保护和运行日志。
-
-## 极昼与黑夜
-
-- 「极昼」采用中性白色表面、白金太阳娘工作台壁纸和雪原页头。
-- 「黑夜」采用炭黑表面、银发月亮娘工作台壁纸和黑色地貌页头。
-
-左下角调色盘按钮切换整套配色，保留圆形展开动画和系统减少动画设置。工作台人物靠右等比完整显示，横幅补白与图片背景匹配，消除左右色块分界。菜单、输入框、选择、焦点及禁用状态跟随主题；最小窗口为 1020×680。
-
-旧 `mint` 偏好映射为极昼，旧 `rose` 映射为黑夜，读取时不改写原文件。旧角色图片及对应主页按钮不再随当前版本发布；Git 历史保留。
+- 任务重试、未保存表单保护和运行日志。
 
 ## 运行要求
 
@@ -84,7 +73,7 @@ $env:LIVECLIP_TEST_FFMPEG = (Resolve-Path .\tools\ffmpeg.exe).Path
 .\.venv\Scripts\python.exe -X utf8 -B quick_ui_test.py
 ```
 
-路径可以替换为自己的隔离测试目录。修改后先暂存已审查的文件，再运行 `release_check.py`。发布检查扫描 Git 将跟踪的文件，验证许可证、五张无参考原图及九项图片资源，并拒绝旧角色素材；它不是完整的安全审计或素材授权审查。
+路径可以替换为自己的隔离测试目录。修改后先暂存已审查的文件，再运行 `release_check.py`。发布检查扫描 Git 将跟踪的文件，验证文档、许可证和资源完整性；它不能替代完整的安全审计。
 
 ## 构建
 
@@ -104,4 +93,4 @@ $env:LIVECLIP_TEST_FFMPEG = (Resolve-Path .\tools\ffmpeg.exe).Path
 
 项目自有源码与 Hikami-Go 派生代码按 GNU GPL v3 分发，全文见 [LICENSE](LICENSE)。Hikami-Go 的来源提交、移植范围，以及 Qt、FFmpeg、Lucide 的声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。第三方声明与原许可证均保留。
 
-皮肤图片的权利状态单独见 [ASSET_RIGHTS.md](assets/ui/ASSET_RIGHTS.md)，不能将代码许可证解读为第三方角色授权。本项目不代表 Bilibili、阿里云或任何主播；请遵守平台规则和相关内容权利要求。
+素材来源见 [ASSET_RIGHTS.md](assets/ui/ASSET_RIGHTS.md)。本项目不代表 Bilibili、阿里云或任何主播；请遵守平台规则和相关内容权利要求。

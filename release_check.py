@@ -99,6 +99,11 @@ def check_release() -> None:
     assert "旧版第三方角色素材已移除" in rights and "不代表第三方权利保证" in rights
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "assets/ui/ASSET_RIGHTS.md" in readme and "GPL" in readme
+    assert all(section in readme for section in ("## 功能", "## 下载", "## 运行要求", "## 源码启动"))
+    assert not any(term in readme for term in (
+        "皮肤", "主题", "极昼", "黑夜", "太阳娘", "月亮娘",
+        "旧版第三方角色", "生成记录不代表",
+    )), "README should focus on application workflows, not appearance changes."
     generation = json.loads((ROOT / "assets/ui/generation-provenance.json").read_text(encoding="utf-8"))
     manifest = json.loads((ROOT / "assets/ui/art-provenance.json").read_text(encoding="utf-8"))
     sources = {"app-icon-source.png", "wallpaper-day.png", "wallpaper-night.png",
@@ -116,7 +121,7 @@ def check_release() -> None:
     for entry in generation["sources"] + manifest["assets"]:
         file = ROOT / "assets/ui" / entry["file"]
         assert hashlib.sha256(file.read_bytes()).hexdigest() == entry["sha256"], file.name
-    print(f"Release checks passed: {len(names)} files; private-file rules, license and artwork hashes.")
+    print(f"Release checks passed: {len(names)} files; private-file rules, documentation, license and artwork hashes.")
     print("Five reference-free originals verified; retired character assets are absent from this snapshot.")
 
 
