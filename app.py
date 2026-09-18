@@ -10151,10 +10151,10 @@ class DesktopApp:
         self.root._window_interaction = WindowInteraction(self.root)
         header = ttk.Frame(desk, padding=(20, 8), style="Header.TFrame")
         header.pack(fill=X)
-        self._character_avatar = art_photo(self.root, "character-sticker.png", (42, 42))
+        self._character_avatar = art_photo(self.root, "app-icon.png", (42, 42))
         ttk.Label(header, image=self._character_avatar, style="HeaderSubtitle.TLabel").pack(side=LEFT, padx=(0, 10))
         ttk.Label(header, text=APP_NAME, style="HeaderTitle.TLabel").pack(side=LEFT)
-        ttk.Label(header, text="羽啾 · 星空创作室", style="HeaderSubtitle.TLabel").pack(side=LEFT, padx=(24, 0))
+        ttk.Label(header, text="极昼", style="HeaderSubtitle.TLabel").pack(side=LEFT, padx=(24, 0))
         ttk.Button(header, text="立即检查", style="Header.TButton", command=self._check_now).pack(side=RIGHT, padx=(8, 0))
         ttk.Button(header, text="退出", style="Header.TButton", command=self._on_close).pack(side=RIGHT)
         # Only the title/background is draggable; action buttons retain their clicks.
@@ -10249,7 +10249,7 @@ class DesktopApp:
         self.character_art = CharacterArt(tab)
         self.character_art.pack(fill=X, pady=(0, 12))
         intro = self.character_art.intro
-        ttk.Label(intro, text="羽啾的切片工作台", style="DashboardTitle.TLabel").pack(anchor="w")
+        ttk.Label(intro, text="切片工作台", style="DashboardTitle.TLabel").pack(anchor="w")
         self.dashboard_hint_var = StringVar(value="录播结束后，自动处理会完成 AI 回顾、选片并按可见性加入投稿队列。")
         hint = ttk.Label(intro, textvariable=self.dashboard_hint_var, style="Muted.TLabel", wraplength=520, justify="left")
         hint.pack(fill=X, pady=(6, 0))
@@ -12512,9 +12512,10 @@ def run_self_test() -> None:
     from danmaku_test import run as check_danmaku_connection
     check_danmaku_connection()
     resource_dir = Path(__file__).resolve().parent
-    with Image.open(resource_dir / "assets" / "ui" / "character.png") as portrait:
-        assert portrait.format == "PNG" and min(portrait.size) >= 512
-        portrait.verify()
+    for name in ("wallpaper-day.png", "wallpaper-night.png", "app-icon-source.png"):
+        with Image.open(resource_dir / "assets" / "ui" / name) as artwork:
+            assert artwork.format == "PNG" and min(artwork.size) >= 512
+            artwork.verify()
     assert "17e30777bc34fc12652df107c84502a9f85d0679" in (resource_dir / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
     assert hashlib.sha256((resource_dir / "licenses" / "hikami-go-LICENSE").read_text(encoding="utf-8").encode("utf-8")).hexdigest() == "e57f1c320b8cf8798a7d2ff83a6f9e06a33a03585f6e065fea97f1d86db84052"
     assert parse_timecode("01:02:03.5") == 3723.5

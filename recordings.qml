@@ -14,13 +14,36 @@ ApplicationWindow {
     font.family: "Microsoft YaHei UI"
     font.pixelSize: 14
     palette.window: uiTheme.current.colors.background
-    palette.windowText: uiTheme.current.colors.ink
-    palette.text: uiTheme.current.colors.ink
-    palette.base: uiTheme.current.colors.surface
-    palette.button: uiTheme.current.colors.button
-    palette.buttonText: uiTheme.current.colors.primary
+    palette.active.windowText: uiTheme.current.colors.ink
+    palette.inactive.windowText: uiTheme.current.colors.ink
+    palette.active.text: uiTheme.current.colors.ink
+    palette.inactive.text: uiTheme.current.colors.ink
+    palette.active.base: uiTheme.current.colors.surface
+    palette.inactive.base: uiTheme.current.colors.surface
+    palette.active.button: uiTheme.current.colors.button
+    palette.inactive.button: uiTheme.current.colors.button
+    palette.active.buttonText: uiTheme.current.colors.primary
+    palette.inactive.buttonText: uiTheme.current.colors.primary
     palette.highlight: uiTheme.current.colors.primary
     palette.highlightedText: uiTheme.current.colors.onPrimary
+    palette.alternateBase: uiTheme.current.colors.listHover
+    palette.light: uiTheme.current.colors.controlHover
+    palette.midlight: uiTheme.current.colors.controlPressed
+    palette.mid: uiTheme.current.colors.fieldBorder
+    palette.dark: uiTheme.current.colors.muted
+    palette.shadow: uiTheme.current.colors.shadow
+    palette.brightText: uiTheme.current.colors.onPrimary
+    palette.accent: uiTheme.current.colors.primary
+    palette.link: uiTheme.current.colors.primary
+    palette.linkVisited: uiTheme.current.colors.primaryHover
+    palette.placeholderText: uiTheme.current.colors.placeholder
+    palette.toolTipBase: uiTheme.current.colors.dialog
+    palette.toolTipText: uiTheme.current.colors.ink
+    palette.disabled.text: uiTheme.current.colors.disabledInk
+    palette.disabled.windowText: uiTheme.current.colors.disabledInk
+    palette.disabled.buttonText: uiTheme.current.colors.disabledInk
+    palette.disabled.base: uiTheme.current.colors.disabled
+    palette.disabled.button: uiTheme.current.colors.disabled
     property bool allowClose: false
     property int page: 2
     property var pageNames: ["录播与总结", "任务", "工作台", "直播间", "切片", "投稿", "账号", "设置"]

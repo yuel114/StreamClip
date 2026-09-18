@@ -10,53 +10,52 @@ from app import write_json_atomic
 
 
 SKINS = {
-    "mint": {
-        "name": "羽啾 · 薄荷",
-        "profileName": "羽啾chu2u",
-        "profileUrl": "https://space.bilibili.com/2138961136",
-        "scene": "wallpaper-studio.png",
-        "sceneFit": False,
-        "header": "wallpaper-sky.png",
+    "day": {
+        "name": "极昼",
+        "dark": False,
+        "scene": "wallpaper-sun.png",
+        "sceneFit": True,
+        "sceneBackground": "#F9F9F9",
+        "header": "wallpaper-day-header.png",
         "colors": {
-            "background": "#EEF2F5", "surface": "#FCFDFE", "rail": "#E3EFEC",
-            "ink": "#34445F", "muted": "#52657C", "primary": "#426E78",
-            "primaryHover": "#365D67", "primaryPressed": "#304D65",
-            "onPrimary": "#FFFFFF", "danger": "#A24761", "warning": "#B64458",
-            "navSelected": "#CFDFDE", "navHover": "#D8E7E4",
-            "selection": "#D9E8ED", "selectionInk": "#304D65", "listHover": "#EDF2F8",
-            "control": "#FFFFFF", "controlHover": "#E3ECEC", "controlPressed": "#D8E6E5",
-            "controlBorder": "#CDD7DC", "button": "#F6F8FC",
-            "fieldBorder": "#AABAC4", "placeholder": "#627582",
-            "disabled": "#E8ECEF", "disabledInk": "#77838B", "disabledText": "#596A7E",
-            "segmented": "#E2E9EC", "segmentHover": "#EEF3F4", "segmentBorder": "#CFDADD",
-            "choicePressed": "#D8E6EB", "switchOff": "#83969F", "switchDisabled": "#C1CCD1",
-            "dialog": "#F9FBFC", "shadow": "#3024313B", "scrim": "#502A3641",
-            "unavailable": "#879BAC",
+            "background": "#F2F3F3", "surface": "#FFFFFF", "rail": "#EAEBEB",
+            "ink": "#242827", "muted": "#57615D", "primary": "#246550",
+            "primaryHover": "#1D5543", "primaryPressed": "#174535",
+            "onPrimary": "#FFFFFF", "danger": "#AC3441", "warning": "#855B14",
+            "navSelected": "#D3DED9", "navHover": "#DFE3E1",
+            "selection": "#DCECE4", "selectionInk": "#214F3E", "listHover": "#F0F3F1",
+            "control": "#FFFFFF", "controlHover": "#E9EEEB", "controlPressed": "#DCE4DF",
+            "controlBorder": "#C6CECA", "button": "#FAFAFA",
+            "fieldBorder": "#909D96", "placeholder": "#626D67",
+            "disabled": "#E4E7E5", "disabledInk": "#7A847E", "disabledText": "#5D6761",
+            "segmented": "#E2E6E3", "segmentHover": "#F1F4F2", "segmentBorder": "#CDD5D0",
+            "choicePressed": "#CDDFD4", "switchOff": "#728178", "switchDisabled": "#BCC5BF",
+            "switchThumb": "#FFFFFF", "dialog": "#FAFBFA", "shadow": "#30202422",
+            "scrim": "#60202422", "unavailable": "#7A847E",
         },
     },
-    # Keep the stored key so the previous second-skin preference survives upgrades.
-    "rose": {
-        "name": "冰蓝 · 蝶影",
-        "profileName": "雨纪_Ameki",
-        "profileUrl": "https://space.bilibili.com/1932862336",
-        "scene": "wallpaper-ice-studio.png",
+    "night": {
+        "name": "黑夜",
+        "dark": True,
+        "scene": "wallpaper-moon.png",
         "sceneFit": True,
-        "header": "wallpaper-ice-header.png",
+        "sceneBackground": "#232426",
+        "header": "wallpaper-night-header.png",
         "colors": {
-            "background": "#F0F3F8", "surface": "#FCFDFF", "rail": "#DFEAF8",
-            "ink": "#303D58", "muted": "#52657F", "primary": "#3D629D",
-            "primaryHover": "#325487", "primaryPressed": "#294770",
-            "onPrimary": "#FFFFFF", "danger": "#A43551", "warning": "#A43551",
-            "navSelected": "#D7DDF3", "navHover": "#D2E3F7",
-            "selection": "#E4E0F5", "selectionInk": "#45416F", "listHover": "#EEF3FB",
-            "control": "#FFFFFF", "controlHover": "#E6EEFA", "controlPressed": "#D8E5F7",
-            "controlBorder": "#CAD5E5", "button": "#F5F7FB",
-            "fieldBorder": "#A2B3CC", "placeholder": "#5D6F88",
-            "disabled": "#E6EBF2", "disabledInk": "#78869A", "disabledText": "#5C6C83",
-            "segmented": "#E2E8F3", "segmentHover": "#EEF2FC", "segmentBorder": "#CDD7EA",
-            "choicePressed": "#DADDF3", "switchOff": "#8298B8", "switchDisabled": "#C3CFDF",
-            "dialog": "#F8FAFE", "shadow": "#30233352", "scrim": "#50303D58",
-            "unavailable": "#879BB6",
+            "background": "#151617", "surface": "#202122", "rail": "#1C1D1E",
+            "ink": "#F0F2F1", "muted": "#BEC7C1", "primary": "#8DD9BA",
+            "primaryHover": "#A8E7CD", "primaryPressed": "#74C4A3",
+            "onPrimary": "#10251C", "danger": "#F398A0", "warning": "#E3BE76",
+            "navSelected": "#34463E", "navHover": "#2B312E",
+            "selection": "#314E40", "selectionInk": "#D9F3E5", "listHover": "#2C312E",
+            "control": "#2B2E2C", "controlHover": "#373D39", "controlPressed": "#414B45",
+            "controlBorder": "#525C55", "button": "#202122",
+            "fieldBorder": "#69766E", "placeholder": "#A4AFA7",
+            "disabled": "#292D2A", "disabledInk": "#77867B", "disabledText": "#A5B1A9",
+            "segmented": "#191C1A", "segmentHover": "#2C342F", "segmentBorder": "#465049",
+            "choicePressed": "#3C5F4C", "switchOff": "#56685C", "switchDisabled": "#3B443E",
+            "switchThumb": "#FFFFFF", "dialog": "#262927", "shadow": "#80000000",
+            "scrim": "#99000000", "unavailable": "#7B8B80",
         },
     },
 }
@@ -70,11 +69,14 @@ class UiTheme(QObject):
     def __init__(self, path, parent=None):
         super().__init__(parent)
         self.path = Path(path)
-        self._key = "mint"
+        self._key = "day"
         self._transitioning = False
         try:
             saved = json.loads(self.path.read_text(encoding="utf-8"))
             key = saved.get("skin") if isinstance(saved, dict) else None
+            # Read old choices without rewriting the user's preference on startup.
+            if isinstance(key, str):
+                key = {"mint": "day", "rose": "night"}.get(key, key)
             if isinstance(key, str) and key in SKINS:
                 self._key = key
         except FileNotFoundError:

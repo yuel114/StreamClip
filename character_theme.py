@@ -311,13 +311,13 @@ class OrbitArt(Canvas):
         root = self.winfo_toplevel()
         self._size = size
         root._motion.cancel("page-art")
-        self._rendered = wallpaper_image(root._ui_art["wallpaper-orbits.png"], size, self.cget("background"))
+        self._rendered = wallpaper_image(root._ui_art["wallpaper-day-header.png"], size, self.cget("background"))
         self._art = ImageTk.PhotoImage(self._rendered, master=root)
         self.itemconfigure(self._image_item, image=self._art)
 
 
 class PageHeading(ttk.Frame):
-    """A shared orbital wallpaper behind the native, readable page title."""
+    """A shared landscape wallpaper behind the native, readable page title."""
     def __init__(self, master, title: str, textvariable=None):
         super().__init__(master, style="App.TFrame")
         self.columnconfigure(0, weight=1)
@@ -354,7 +354,7 @@ class CharacterArt(Canvas):
             root = self.winfo_toplevel()
             self._size = size
             root._motion.cancel("page-art")
-            self._rendered = rounded_image(wallpaper_image(root._ui_art["wallpaper-studio.png"], size, SURFACE, fill_width=True), 16, UI_COLORS["bg"])
+            self._rendered = rounded_image(wallpaper_image(root._ui_art["wallpaper-day.png"], size, SURFACE, fill_width=True), 16, UI_COLORS["bg"])
             self._art = ImageTk.PhotoImage(self._rendered, master=root)
             self.itemconfigure(self._image_item, image=self._art)
 
@@ -366,12 +366,12 @@ def install_theme(root):
     root.style = style
     root._motion = Motion(root)
     root._ui_art = {}
-    for name in ("wallpaper-studio.png", "wallpaper-orbits.png", "character-sticker.png", "app-icon.png"):
+    for name in ("wallpaper-day.png", "wallpaper-day-header.png", "app-icon.png"):
         with Image.open(ASSET_DIR / name) as image:
             root._ui_art[name] = image.convert("RGBA")
     root._window_icon = art_photo(root, "app-icon.png", (256, 256))
     root.iconphoto(True, root._window_icon)
-    root._empty_art = art_photo(root, "character-sticker.png", (64, 64))
+    root._empty_art = art_photo(root, "app-icon.png", (64, 64))
     root._theme_images = []
     for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
         tkfont.nametofont(name, root=root).configure(family="Microsoft YaHei UI", size=10)

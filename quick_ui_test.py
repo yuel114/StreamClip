@@ -9,7 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PySide6.QtCore import QCoreApplication, QEvent, QEventLoop, QObject, QPointF, Qt, QTimer, QUrl, Slot, qInstallMessageHandler
-from PySide6.QtGui import QColor, QDesktopServices, QFontMetricsF, QGuiApplication
+from PySide6.QtGui import QColor, QDesktopServices, QFontMetricsF, QGuiApplication, QImage
 from PySide6.QtQuickControls2 import QQuickStyle
 from PySide6.QtTest import QTest
 from PySide6.QtMultimedia import QMediaPlayer
@@ -27,22 +27,23 @@ def qml_call(target, expression):
     return result
 
 
-def assert_selection_colors(foreground, background):
-    assert foreground.name() == "#304d65", foreground.name()
-    assert background.name() in {"#d9e8ed", "#d8e6eb"}, background.name()
+def assert_color_contrast(foreground, background, minimum=4.5):
     luminances = []
     for color in (foreground, background):
         channels = (color.redF(), color.greenF(), color.blueF())
         linear = [value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4 for value in channels]
         luminances.append(sum(value * weight for value, weight in zip(linear, (0.2126, 0.7152, 0.0722))))
     low, high = sorted(luminances)
-    assert (high + 0.05) / (low + 0.05) >= 4.5, "选中文字对比度不足"
+    assert (high + 0.05) / (low + 0.05) >= minimum, (foreground.name(), background.name(), minimum)
 
 
 def assert_combo_selection(control):
     row = qml_call(control, "popup.contentItem.currentItem")[0]
     assert row is not None and row.property("highlighted"), "下拉菜单缺少选中项"
-    assert_selection_colors(qml_call(row, "contentItem.color")[0], qml_call(row, "background.color")[0])
+    foreground, background = qml_call(row, "contentItem.color")[0], qml_call(row, "background.color")[0]
+    assert foreground == QColor(qml_call(control, "uiTheme.current.colors.selectionInk")[0])
+    assert background in [QColor(qml_call(control, "uiTheme.current.colors." + role)[0]) for role in ("selection", "choicePressed")]
+    assert_color_contrast(foreground, background)
 
 
 def calendar_month(window, prefix, year, month):
@@ -756,6 +757,9 @@ def assert_native_resize_edges(window, output):
     from PIL import ImageGrab
 
     user = ctypes.WinDLL("user32", use_last_error=True)
+    dwm = ctypes.WinDLL("dwmapi")
+    dwm.DwmFlush.argtypes = []
+    dwm.DwmFlush.restype = ctypes.c_long
     user.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
     user.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
     user.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
@@ -774,8 +778,8 @@ def assert_native_resize_edges(window, output):
     try:
         for i, (extra_width, extra_height) in enumerate(((180, 110), (330, 170))):
             assert user.SetWindowPos(handle, -1, rect.left, rect.top, rect.right - rect.left + extra_width, rect.bottom - rect.top + extra_height, 0x0010)
-            # 故意不泵 Qt 事件：扩窗已交给系统，新 GPU 帧尚不能同步。
-            time.sleep(0.06)
+            # Wait for DWM, not Qt: a fixed sleep can capture the previous window bounds.
+            assert dwm.DwmFlush() == 0, "DWM 尚未完成扩窗合成"
             client, origin = wintypes.RECT(), wintypes.POINT(0, 0)
             assert user.GetClientRect(handle, ctypes.byref(client))
             assert user.ClientToScreen(handle, ctypes.byref(origin))
@@ -783,14 +787,14 @@ def assert_native_resize_edges(window, output):
             picture.save(output / f"native-growing-{i}.png")
             w, h = picture.size
             strips = [picture.crop((w - 48, h // 3, w - 4, h * 2 // 3)), picture.crop((w // 3, h - 36, w * 2 // 3, h - 4))]
-            dark, background = [], []
+            black, background = [], []
             for strip in strips:
                 pixels = list(zip(*[iter(strip.tobytes())] * 3))
-                dark.append(sum(max(pixel) < 32 for pixel in pixels) / len(pixels))
+                black.append(sum(max(pixel) < 4 for pixel in pixels) / len(pixels))
                 background.append(sum(max(abs(c - expected) for c, expected in zip(pixel, background_rgb)) <= 2 for pixel in pixels) / len(pixels))
-            samples.append({"size": [w, h], "dark_edge_ratios": dark, "theme_background_ratios": background})
+            samples.append({"size": [w, h], "black_edge_ratios": black, "theme_background_ratios": background})
         (output / "native-edges.json").write_text(json.dumps(samples, indent=2), encoding="utf-8")
-        assert all(max(sample["dark_edge_ratios"]) < 0.01 for sample in samples), samples
+        assert all(max(sample["black_edge_ratios"]) < 0.01 for sample in samples), samples
         assert all(min(sample["theme_background_ratios"]) > 0.99 for sample in samples), "扩窗区域透底或颜色错误：" + str(samples)
     finally:
         assert user.SetWindowPos(handle, -2, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, 0x0010)
@@ -1026,8 +1030,8 @@ def check_apple_ui(application, bridge, window, output):
             assert save.property("activeFocus") and not save.property("hovered")
             ring = save.findChild(QObject, "primaryFocusRing")
             assert ring.property("visible") and qml_call(ring, "border.width")[0] == 2
-            assert qml_call(ring, "border.color")[0].name() == "#ffffff"
-            assert qml_call(save, "background.color")[0].name() == "#426e78"
+            assert qml_call(ring, "border.color")[0] == QColor(qml_call(save, "uiTheme.current.colors.onPrimary")[0])
+            assert qml_call(save, "background.color")[0] == QColor(qml_call(save, "uiTheme.current.colors.primary")[0])
             assert window.grabWindow().save(str(output / "apple-keyboard-focus.png"))
             tabs = window.findChild(QObject, "settingsTabs")
             qml_call(tabs, "currentItem.forceActiveFocus()")
@@ -1113,88 +1117,169 @@ def check_skin_preferences(output):
     with tempfile.TemporaryDirectory(dir=output) as folder:
         path = Path(folder) / "appearance.json"
         theme = UiTheme(path)
-        assert theme.key == "mint" and theme.nextKey == "rose"
-        assert theme.select("rose") and UiTheme(path).key == "rose"
-        assert theme.current["name"] == "冰蓝 · 蝶影", "旧第二皮肤记录应直接加载新的角色皮肤"
-        assert theme.current["scene"] == "wallpaper-ice-studio.png"
-        assert theme.current["header"] == "wallpaper-ice-header.png"
-        assert theme.nextKey == "mint" and len(SKINS) == 2, "新角色应替换第二套，而不是添加第三套"
+        assert theme.key == "day" and theme.nextKey == "night"
+        assert theme.select("night") and UiTheme(path).key == "night"
+        assert theme.current["name"] == "黑夜"
+        assert theme.current["scene"] == "wallpaper-moon.png"
+        assert theme.current["sceneFit"]
+        assert theme.current["header"] == "wallpaper-night-header.png"
+        assert theme.nextKey == "day" and len(SKINS) == 2, "应替换旧素材，不增加第三套皮肤"
         saved = path.read_bytes()
         errors = []
         theme.error.connect(errors.append)
         assert not theme.select("../unknown") and path.read_bytes() == saved
         with patch("quick_theme.write_json_atomic", side_effect=OSError("read-only")):
-            assert not theme.select("mint") and theme.key == "rose"
+            assert not theme.select("day") and theme.key == "night"
         assert len(errors) == 2 and path.read_bytes() == saved
         for invalid in ('{"skin":[]}', '{"skin":"unknown"}', "[]", "broken"):
             path.write_text(invalid, encoding="utf-8")
-            assert UiTheme(path).key == "mint"
+            assert UiTheme(path).key == "day"
             assert path.read_text(encoding="utf-8") == invalid, "不能在读取时覆盖坏文件"
-    assert set(SKINS["mint"]["colors"]) == set(SKINS["rose"]["colors"])
-    assert SKINS["mint"]["profileUrl"] == "https://space.bilibili.com/2138961136"
-    assert SKINS["rose"]["profileUrl"] == "https://space.bilibili.com/1932862336"
+        for legacy, current in (("mint", "day"), ("rose", "night")):
+            path.write_text(json.dumps({"skin": legacy}), encoding="utf-8")
+            saved = path.read_bytes()
+            theme = UiTheme(path)
+            assert theme.key == current and path.read_bytes() == saved, "读取旧偏好不能擅自改写用户文件"
+            assert theme.select(theme.nextKey) and UiTheme(path).key != current
+    assert set(SKINS["day"]["colors"]) == set(SKINS["night"]["colors"])
     for skin in SKINS.values():
         for asset in ("scene", "header"):
             assert (Path(ui.__file__).parent / "assets/ui" / skin[asset]).is_file()
         colors = skin["colors"]
+        for role in ("ink", "muted"):
+            assert_color_contrast(QColor(colors[role]), QColor(skin["sceneBackground"]))
         for foreground, background in (("ink", "surface"), ("ink", "rail"), ("ink", "background"),
-                                      ("muted", "rail"), ("muted", "surface"), ("placeholder", "surface"),
+                                      ("muted", "rail"), ("muted", "surface"), ("muted", "background"), ("placeholder", "surface"),
+                                      ("muted", "selection"), ("muted", "navSelected"), ("muted", "listHover"),
+                                      ("ink", "control"), ("ink", "dialog"), ("ink", "navSelected"),
+                                      ("ink", "choicePressed"),
+                                      ("primary", "surface"), ("danger", "surface"), ("warning", "surface"),
                                       ("selectionInk", "selection"), ("selectionInk", "choicePressed"),
                                       ("onPrimary", "primary"), ("onPrimary", "primaryHover"), ("onPrimary", "primaryPressed")):
-            luminances = []
-            for role in (foreground, background):
-                color = QColor(colors[role])
-                channels = (color.redF(), color.greenF(), color.blueF())
-                linear = [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in channels]
-                luminances.append(sum(v * w for v, w in zip(linear, (0.2126, 0.7152, 0.0722))))
-            low, high = sorted(luminances)
-            assert (high + 0.05) / (low + 0.05) >= 4.5, (skin["name"], foreground, background)
+            assert_color_contrast(QColor(colors[foreground]), QColor(colors[background]))
+        for role in ("background", "surface", "rail"):
+            r, g, b, _ = QColor(colors[role]).getRgb()
+            assert max(r, g, b) - min(r, g, b) <= 3, "大面积表面必须为中性黑白"
+            assert max(r, g, b) < 48 if skin["dark"] else min(r, g, b) > 230
+        assert_color_contrast(QColor(colors["switchThumb"]), QColor(colors["switchOff"]), 3)
+        assert_color_contrast(QColor(colors["onPrimary"]), QColor(colors["primary"]), 3)
 
 
-def check_skin_profile_links(application, bridge, engine, window, output):
+def check_workbench_portrait(application, engine, window, output):
+    artwork = window.findChild(QObject, "workbenchArtwork")
+    intro = window.findChild(QObject, "workbenchIntro")
+    wait_for(application, lambda: artwork.property("status") == 1)
+    assert qml_call(artwork, "fillMode === Image.PreserveAspectFit && horizontalAlignment === Image.AlignRight")[0]
+    painted_width = qml_call(artwork, "children[0].paintedWidth")[0]
+    painted_height = qml_call(artwork, "children[0].paintedHeight")[0]
+    assert abs(painted_width - 480) < 0.1 and abs(painted_height - 180) < 0.1, "人物必须完整等比显示，不能裁切头部"
+    assert intro.x() + intro.width() <= artwork.width() - painted_width / 2, "文字与人物区域重叠"
+    picture = window.grabWindow()
+    assert not picture.isNull()
+    ratio = picture.devicePixelRatio()
+    origin = artwork.mapToScene(QPointF(artwork.width() - painted_width, 0))
+    background = qml_call(artwork, "parent.children[0].color")[0]
+    # Sample empty areas on both sides of the image edge, allowing only image grain.
+    for x in (-12, 12, 120):
+        for y in (16, painted_height - 16):
+            actual = picture.pixelColor(round((origin.x() + x) * ratio), round((origin.y() + y) * ratio))
+            assert max(abs(a - b) for a, b in zip(actual.getRgb(), background.getRgb())) <= 2, (
+                "横幅左右背景存在色差", engine.ui_theme.key, x, y, actual.name(), background.name())
+    source = QImage(artwork.property("source").toLocalFile()).scaled(
+        round(painted_width * ratio), round(painted_height * ratio), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    # Check the rendered crown, face and costume, not just the QML source URL.
+    for x, y in ((340, 20), (350, 72), (400, 120)):
+        expected = source.pixelColor(round(x * ratio), round(y * ratio))
+        actual = picture.pixelColor(round((origin.x() + x) * ratio), round((origin.y() + y) * ratio))
+        assert max(abs(a - b) for a, b in zip(actual.getRgb(), expected.getRgb())) <= 14, "人物像素被裁切、覆盖或丢失"
+    assert picture.save(str(output / f"workbench-{engine.ui_theme.key}-{window.width()}.png"))
+
+
+def check_theme_controls(application, bridge, engine, window, output):
     theme = engine.ui_theme
-    link = window.findChild(QObject, "skinProfileLink")
+    colors = theme.current["colors"]
+    pages = window.findChild(QObject, "workspacePages")
     form = window.findChild(QObject, "settingsForm")
-    old_skin, old_page = theme.key, window.property("page")
-    before = (qml_call(form, "JSON.stringify(values)")[0], form.property("dirty"), bridge.settings_path.read_bytes())
-    opened = []
-
-    class UrlReceiver(QObject):
-        @Slot(QUrl)
-        def receive(self, url):
-            opened.append(url.toString())
-
-    receiver = UrlReceiver()
-    QDesktopServices.setUrlHandler("https", receiver, "receive")
+    original = qml_call(form, "JSON.stringify(values)")[0]
+    dirty, page, category = form.property("dirty"), window.property("page"), pages.property("settingsCategory")
+    assert not bridge.busy
     try:
-        window.setProperty("page", 2)
-        for skin, url in (("mint", "https://space.bilibili.com/2138961136"),
-                          ("rose", "https://space.bilibili.com/1932862336")):
-            assert theme.select(skin)
-            for width, height in ((1020, 680), (1280, 820)):
-                window.resize(width, height)
-                QTest.qWait(180)
-                assert link.property("visible") and link.property("text") == "拜托给个关注吧~"
-                assert theme.current["profileName"] in qml_call(link, "Accessible.name")[0]
-                assert qml_call(link, "Accessible.description")[0] == url
-                assert qml_call(link, "x >= parent.width * 0.65 + 22 && x + width <= parent.width && y >= 0 && y + height <= parent.height")[0], "关注按钮遮挡操作区或超出皮肤"
-                assert link.property("implicitContentWidth") <= link.width() - link.property("leftPadding") - link.property("rightPadding"), "关注按钮文字被裁切"
-                center = link.mapToItem(window.contentItem(), QPointF(link.width() / 2, link.height() / 2))
-                QTest.mouseClick(window, Qt.LeftButton, Qt.NoModifier, center.toPoint())
-                qml_call(link, "forceActiveFocus()")
-                QTest.keyClick(window, Qt.Key_Space)
-                assert opened[-2:] == [url, url], "关注按钮没有跟随当前皮肤，或键盘操作无效"
-                assert window.grabWindow().save(str(output / f"skin-profile-{skin}-{width}.png"))
-        assert len(opened) == 8
-        assert before == (qml_call(form, "JSON.stringify(values)")[0], form.property("dirty"), bridge.settings_path.read_bytes()), "打开主页不应改动业务设置"
+        for palette_role, role in (("window", "background"), ("base", "surface"),
+                                   ("light", "controlHover"), ("mid", "fieldBorder"),
+                                   ("text", "ink"), ("toolTipBase", "dialog"),
+                                   ("toolTipText", "ink"), ("disabled.text", "disabledInk")):
+            actual = qml_call(window, "palette." + palette_role)[0]
+            assert actual == QColor(colors[role]), (theme.key, palette_role, actual.name(), colors[role])
+        window.setProperty("page", 0)
+        QTest.qWait(220)
+        summary = window.findChild(QObject, "summaryText")
+        assert summary.property("selectionColor") == QColor(colors["primary"])
+        assert summary.property("selectedTextColor") == QColor(colors["onPrimary"])
+        combo = window.findChild(QObject, "recordingStreamerFilter")
+        assert qml_call(combo, "indicator.color")[0] == QColor(colors["ink"])
+        assert not qml_call(combo, "indicator.layer.enabled")[0], "箭头着色不应分配额外渲染图层"
+        origin = qml_call(combo, "indicator.mapToItem(null, 0, 0)")[0]
+        picture = window.grabWindow()
+        scale = picture.devicePixelRatio()
+        samples = [picture.pixelColor(round((origin.x() + x) * scale), round((origin.y() + y) * scale)).lightness()
+                   for x in range(16) for y in range(16)]
+        assert max(samples) > 150 if theme.current["dark"] else min(samples) < 160, "下拉箭头不可见"
+        qml_call(combo, "forceActiveFocus(); popup.open()")
+        wait_for(application, lambda: qml_call(combo, "popup.opened")[0])
+        assert_combo_selection(combo)
+        assert qml_call(combo, "contentItem.color")[0] == QColor(colors["ink"])
+        assert_color_contrast(qml_call(combo, "contentItem.color")[0], qml_call(combo, "background.color")[0])
+        assert window.grabWindow().save(str(output / f"skin-{theme.key}-menu.png"))
+        qml_call(combo, "popup.close()")
+        wait_for(application, lambda: not qml_call(combo, "popup.visible")[0])
+        calendar = window.findChild(QObject, "recordingCalendar")
+        qml_call(window.findChild(QObject, "recordingDateFilter"), "clicked()")
+        wait_for(application, lambda: calendar.property("opened"))
+        year = window.findChild(QObject, "recordingCalendarYear")
+        assert qml_call(year, "background.color")[0] == QColor(colors["surface"])
+        assert qml_call(year, "contentItem.color")[0] == QColor(colors["ink"])
+        assert qml_call(year, "up.indicator.color")[0] == QColor(colors["button"])
+        assert window.grabWindow().save(str(output / f"skin-{theme.key}-calendar.png"))
+        qml_call(calendar, "close()")
+
         window.setProperty("page", 7)
-        application.processEvents()
-        assert not link.property("visible"), "关注按钮只应出现在工作台皮肤区域"
+        pages.setProperty("settingsCategory", 0)
+        QTest.qWait(220)
+        items = [form]
+        for item in items:
+            items.extend(item.childItems())
+        toggle = next(item for item in items if item.objectName() == "toggle_auto_slice")
+        for checked in (True, False):
+            qml_call(form, "setValue('auto_slice', " + str(checked).lower() + ")")
+            QTest.qWait(220)
+            assert toggle.property("checked") == checked
+            thumb = qml_call(toggle, "indicator.children[0].color")[0]
+            track = qml_call(toggle, "indicator.color")[0]
+            assert_color_contrast(thumb, track, 3)
+        save = window.findChild(QObject, "saveSettingsButton")
+        QTest.mouseMove(window, QPointF(1, 1).toPoint())
+        qml_call(save, "forceActiveFocus()")
+        ring = save.findChild(QObject, "primaryFocusRing")
+        assert ring.property("visible")
+        assert_color_contrast(qml_call(ring, "border.color")[0], qml_call(save, "background.color")[0], 3)
+        assert window.grabWindow().save(str(output / f"skin-{theme.key}-focus.png"))
+        bridge._busy = True
+        bridge.changed.emit()
+        QTest.qWait(180)
+        assert not toggle.property("enabled") and not save.property("enabled")
+        assert qml_call(save, "background.color")[0] == QColor(colors["disabled"])
+        assert qml_call(save, "foreground")[0] == QColor(colors["disabledInk"])
+        assert window.grabWindow().save(str(output / f"skin-{theme.key}-disabled.png"))
     finally:
-        QDesktopServices.unsetUrlHandler("https")
-        theme.select(old_skin)
-        window.setProperty("page", old_page)
-    print("Skin profile checks passed: both profiles, mouse and keyboard, two sizes, unchanged business settings.")
+        bridge._busy = False
+        bridge.changed.emit()
+        qml_call(window.findChild(QObject, "recordingCalendar"), "close()")
+        qml_call(window.findChild(QObject, "recordingStreamerFilter"), "popup.close()")
+        qml_call(form, "reset(" + original + ")")
+        form.setProperty("dirty", dirty)
+        pages.setProperty("settingsCategory", category)
+        window.setProperty("page", page)
+        QTest.qWait(220)
 
 
 def check_skin_switch(application, bridge, engine, window, output):
@@ -1229,7 +1314,7 @@ def check_skin_switch(application, bridge, engine, window, output):
             for _ in range(5):
                 qml_call(button, "clicked()")
             wait_for(application, lambda: transition.property("phase") == "revealing")
-            assert theme.key == "rose" and wave.property("running"), "点击应切换一次并产生圆形展开"
+            assert theme.key == "night" and wave.property("running"), "点击应切换一次并产生圆形展开"
             assert not qml_call(button, "ToolTip.visible")[0], "扩散中不应残留旧皮肤的悬停提示"
             QTest.qWait(45)
             assert 0 < transition.property("revealRadius") < transition.property("fullRadius"), "半径未实际随时间增长"
@@ -1252,16 +1337,16 @@ def check_skin_switch(application, bridge, engine, window, output):
             assert not theme.transitioning
             assert transition.childItems()[0].property("sourceItem") is None, "动画结束仍保留页面快照源"
             assert artwork.property("source") != before_art and header.property("source") != before_header
-            assert artwork.property("source").fileName() == theme.current["scene"] == "wallpaper-ice-studio.png"
-            assert qml_call(artwork, "fillMode === Image.PreserveAspectFit && horizontalAlignment === Image.AlignRight")[0], "新角色应按高度等比展示，不能被窄横幅裁掉头饰"
-            assert header.property("source").fileName() == theme.current["header"] == "wallpaper-ice-header.png"
-            assert "冰蓝 · 蝶影" in qml_call(button, "Accessible.description")[0]
-            assert "羽啾 · 薄荷" in qml_call(button, "ToolTip.text")[0], "完成切换后提示应指向下一套皮肤"
+            assert artwork.property("source").fileName() == theme.current["scene"] == "wallpaper-moon.png"
+            assert qml_call(artwork, "fillMode === Image.PreserveAspectFit && horizontalAlignment === Image.AlignRight")[0], "人物壁纸应靠右完整等比显示，不能裁掉头部"
+            assert header.property("source").fileName() == theme.current["header"] == "wallpaper-night-header.png"
+            assert "黑夜" in qml_call(button, "Accessible.description")[0]
+            assert "极昼" in qml_call(button, "ToolTip.text")[0], "完成切换后提示应指向下一套皮肤"
             QTest.mouseMove(window, QPointF(1, 1).toPoint())
             assert QColor(theme.current["colors"]["background"]) == window.color()
             assert qml_call(form, "values.llm_model")[0] == "offline-unsaved-skin-draft" and form.property("dirty")
             assert bridge.settings_path.read_bytes() == saved_config, "换肤不能覆盖业务配置或保存草稿"
-            assert ui.UiTheme(theme.path).key == "rose", "重启未保留皮肤"
+            assert ui.UiTheme(theme.path).key == "night", "重启未保留皮肤"
 
             for width, height in ((1280, 820), (1020, 680)):
                 window.resize(width, height)
@@ -1272,20 +1357,23 @@ def check_skin_switch(application, bridge, engine, window, output):
                 for target in range(8):
                     window.setProperty("page", target)
                     QTest.qWait(190)
-                    assert window.grabWindow().save(str(output / f"skin-ice-page-{target}-{width}.png"))
+                    if target == 2:
+                        check_workbench_portrait(application, engine, window, output)
+                    assert window.grabWindow().save(str(output / f"skin-night-page-{target}-{width}.png"))
             dialog = window.findChild(QObject, "deleteRecordingDialog")
             qml_call(dialog, "open()")
             wait_for(application, lambda: dialog.property("opened"))
             assert qml_call(dialog, "background.color")[0] == QColor(theme.current["colors"]["dialog"])
-            assert window.grabWindow().save(str(output / "skin-ice-dialog.png"))
+            assert window.grabWindow().save(str(output / "skin-night-dialog.png"))
             qml_call(dialog, "close()")
             wait_for(application, lambda: not dialog.property("visible"))
-            assert_native_resize_edges(window, output / "rose-edges")
+            check_theme_controls(application, bridge, engine, window, output)
+            assert_native_resize_edges(window, output / "night-edges")
 
             qml_call(button, "forceActiveFocus()")
             QTest.keyClick(window, Qt.Key_Space)
             wait_for(application, lambda: transition.property("phase") == "revealing")
-            assert theme.key == "mint" and button.property("activeFocus")
+            assert theme.key == "day" and button.property("activeFocus")
             qml_call(wave, "pause()")
             window.resize(window.width() + 10, window.height() + 10)
             wait_for(application, lambda: not transition.property("busy"), timeout=0.3)
@@ -1293,18 +1381,18 @@ def check_skin_switch(application, bridge, engine, window, output):
             qml_call(button, "clicked()")
             assert transition.property("busy")
         bridge.refreshMotionPreference()
-        assert not transition.property("busy") and not theme.transitioning and theme.key == "rose"
+        assert not transition.property("busy") and not theme.transitioning and theme.key == "night"
         qml_call(button, "clicked()")
-        assert theme.key == "mint" and not transition.property("busy"), "关闭系统动画时应立即切换"
+        assert theme.key == "day" and not transition.property("busy"), "关闭系统动画时应立即切换"
         with patch("quick_theme.write_json_atomic", side_effect=OSError("read-only")):
             qml_call(button, "clicked()")
-            assert theme.key == "mint" and not transition.property("busy")
+            assert theme.key == "day" and not transition.property("busy")
         qml_call(window, "errorDialog.close()")
         print("Skin checks passed: circular reveal pixels, all pages, artwork, persistence, drafts, keyboard, reduced motion, resize and save failure")
     finally:
         qml_call(transition, "finish()")
         bridge.refreshMotionPreference()
-        theme.select("mint")
+        theme.select("day")
         qml_call(form, "reset(" + original + ")")
         form.setProperty("dirty", dirty)
         window.setProperty("page", page)
@@ -1441,8 +1529,8 @@ def run(motion_preference):
             summary = window.findChild(QObject, "summaryText")
             qml_call(summary, "selectAll()")
             assert qml_call(summary, "selectedText.length")[0] > 0
-            assert summary.property("selectedTextColor").name() == "#ffffff"
-            assert summary.property("selectionColor").name() == "#426e78", "下拉配色不应改动文本选择和键盘焦点"
+            assert summary.property("selectedTextColor") == QColor(engine.ui_theme.current["colors"]["onPrimary"])
+            assert summary.property("selectionColor") == QColor(engine.ui_theme.current["colors"]["primary"]), "下拉配色不应改动文本选择和键盘焦点"
             qml_call(summary, "deselect()")
 
             # Real confirmation flow: hidden live record, cancel, captured target, file removal and empty detail.
@@ -1475,7 +1563,7 @@ def run(motion_preference):
             wait_for(application, lambda: bridge.detail["id"] == 0)
             assert not delete_button.property("enabled") and not bridge.detail["highlights"]
             bridge.selectRecording(rid)
-            wait_for(application, lambda: bridge.detail["id"] == rid)
+            wait_for(application, lambda: not bridge._refreshing and bridge.detail["id"] == rid and bridge.detail["canAnalyze"])
 
             for width, height in ((1280, 820), (1020, 680)):
                 window.resize(width, height)
@@ -1492,6 +1580,8 @@ def run(motion_preference):
                         assert reanalyze is not None and reanalyze.property("visible")
                         assert reanalyze.property("text") == "重新 AI 总结切片"
                         assert delete_button.property("visible") and delete_button.property("text") == "删除录播"
+                    if page == 2:
+                        check_workbench_portrait(application, engine, window, output)
                     # 抓取系统已呈现的窗口，不通过强制重绘掩盖呈现问题。
                     picture = window.screen().grabWindow(int(window.winId())).toImage()
                     assert not picture.isNull()
@@ -1503,12 +1593,16 @@ def run(motion_preference):
 
             assert_fixed_columns(window, output)
             check_apple_ui(application, bridge, window, output)
-            (output / "rose-edges").mkdir(exist_ok=True)
+            check_theme_controls(application, bridge, engine, window, output)
+            (output / "night-edges").mkdir(exist_ok=True)
             check_skin_switch(application, bridge, engine, window, output)
-            check_skin_profile_links(application, bridge, engine, window, output)
             assert_native_resize_edges(window, output)
 
             # 连续改变真实窗口尺寸，同时让数据库读取每次阻塞 150ms。
+            # Settle popup/native-edge checks before measuring the visible window.
+            window.raise_()
+            window.requestActivate()
+            wait_for(application, window.isActive)
             frames, ticks = [], []
             window.frameSwapped.connect(lambda: frames.append(time.perf_counter()), Qt.QueuedConnection)
             timer = QTimer()
@@ -1523,6 +1617,11 @@ def run(motion_preference):
             bridge.timer.start(180)
             with patch.object(db, "list_recordings", side_effect=slow_records):
                 loop = QEventLoop()
+                # Warm the renderer at the same resize/database load, not an idle page.
+                QTimer.singleShot(1500, loop.quit)
+                loop.exec()
+                frames.clear()
+                ticks.clear()
                 QTimer.singleShot(5000, loop.quit)
                 loop.exec()
             timer.stop()
@@ -1533,6 +1632,7 @@ def run(motion_preference):
             ordered = sorted(intervals)
             resize_intervals = sorted((b - a) * 1000 for a, b in zip(ticks, ticks[1:]))
             report = {"graphics_api": str(window.rendererInterface().graphicsApi()), "frames": len(frames), "resize_updates": len(ticks), "resize_hz": (len(ticks) - 1) / (ticks[-1] - ticks[0]), "resize_p95_ms": resize_intervals[int(len(resize_intervals) * .95)], "frame_callback_hz": (len(frames) - 1) / (frames[-1] - frames[0]), "median_ms": statistics.median(intervals), "p95_ms": ordered[int(len(ordered) * .95)], "max_ms": max(intervals), "over_33ms": sum(v > 33.34 for v in intervals), "method": "5 秒程序连续缩放，300 条录播，后台数据库读取延迟 150ms；帧回调经队列在 GUI 线程计时，不是显示器实际呈现帧率；不等同于手工拖边框验收", "qml_warnings": warnings}
+            report["warmup_ms"] = 1500
             # 静止和忙碌状态不能因禁用 Present 等待而无限重绘。
             QTest.qWait(200)
             frames.clear()

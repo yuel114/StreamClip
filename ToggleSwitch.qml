@@ -22,7 +22,7 @@ Switch {
             radius: 10
             x: 2 + control.visualPosition * 18
             y: 2
-            color: control.enabled ? uiTheme.current.colors.control : uiTheme.current.colors.disabled
+            color: !control.enabled ? uiTheme.current.colors.disabledInk : control.checked ? uiTheme.current.colors.onPrimary : uiTheme.current.colors.switchThumb
             Behavior on x { enabled: !control.down; NumberAnimation { duration: bridge.motionEnabled && !uiTheme.transitioning ? 160 : 0; easing.type: Easing.OutCubic } }
         }
     }

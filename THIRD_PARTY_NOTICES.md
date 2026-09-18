@@ -4,7 +4,9 @@
 
 ## 皮肤与生成素材
 
-本仓库保留两套皮肤及其图片。发布者尚未取得相关角色和参考图衍生素材的公开再分发授权；这些图片不包含在项目对自有源码作出的 GPL 授权声明中。详细范围、生成来源及未解决事项见 [assets/ui/ASSET_RIGHTS.md](assets/ui/ASSET_RIGHTS.md)。来源记录和 AI 生成记录不是权利人许可，不应据此推断已获商用或再分发授权。
+当前「极昼」与「黑夜」皮肤使用独立生成的太阳娘、月亮娘和地貌图片；通用应用图标也未使用角色参考图。五张原图的 `references` 均为空，生成通道、提示词与哈希记录在 `assets/ui/generation-provenance.json`，九项最终图片的派生配方与哈希记录在 `assets/ui/art-provenance.json`。
+
+旧版第三方角色图片及相应参考图派生件已从当前版本移除，不再打包；Git 历史未重写。详细范围见 [assets/ui/ASSET_RIGHTS.md](assets/ui/ASSET_RIGHTS.md)。生成记录不代表第三方权利保证，也不等同于对任何现有角色、商标或他人作品作出授权。
 
 ## Lucide 图标
 

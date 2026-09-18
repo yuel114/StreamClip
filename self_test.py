@@ -2121,11 +2121,6 @@ def assert_visual_system_has_consistent_surfaces(desktop: app.DesktopApp | None 
             assert_readable(app.UI_COLORS[name], background, name)
     for foreground, background, context in ((MUTED, RAIL, "navigation guidance"), (MUTED, STRIPE, "table guidance"), (app.UI_COLORS["fg"], TABLE_HEADER, "table heading"), (app.UI_COLORS["selectfg"], app.UI_COLORS["selectbg"], "selected row"), (app.UI_COLORS["inputfg"], app.UI_COLORS["inputbg"], "input text"), (DISABLED_FG, DISABLED_BG, "disabled guidance")):
         assert_readable(foreground, background, context)
-    provenance = json.loads((ASSET_DIR / "character-provenance.json").read_text(encoding="utf-8"))
-    assert provenance["reference_sha256"] == "355fe4c72b3eb19269b24df11d8cbb7e029fa39910c142ec37b03e6ed6bb1345"
-    with app.Image.open(ASSET_DIR / "character.png") as image:
-        assert image.format == "PNG" and min(image.size) >= 512
-        assert image.mode == provenance["pixel_mode"]
     face = flat_surface(app.UI_COLORS["primary"], app.UI_COLORS["primary"])
     center = face.getpixel((14, 14))
     assert all(face.getpixel((14, y)) == center for y in (8, 12, 18, 20)), "flat button acquired a gradient/bevel"
@@ -2134,25 +2129,47 @@ def assert_visual_system_has_consistent_surfaces(desktop: app.DesktopApp | None 
 
 
 def assert_character_art_assets() -> None:
-    """Verify generated provenance, UI derivatives and readable adaptive crops."""
+    """Verify provenance, derivatives, readable crops and uncropped portrait crowns."""
     from character_theme import ASSET_DIR, RAIL, SURFACE, wallpaper_image
+    from PIL import ImageStat
     manifest = json.loads((ASSET_DIR / "art-provenance.json").read_text(encoding="utf-8"))
     assert manifest["method"] == "generated-images-with-offline-derivatives" and manifest["new_ai_generation"]
     generation = json.loads((ASSET_DIR / manifest["generation_provenance"]).read_text(encoding="utf-8"))
     sources = {item["file"]: item for item in generation["sources"]}
-    assert set(sources) == {"wallpaper-studio.png", "wallpaper-sky.png", "character-sticker.png", "app-icon-source.png", "wallpaper-ice-studio.png", "wallpaper-ice-sky.png"}
-    assert {entry["file"] for entry in manifest["assets"]} == {*sources, "wallpaper-orbits.png", "wallpaper-ice-header.png", "app-icon.png", "app-icon.ico"}
-    assert not (ASSET_DIR / "wallpaper-portrait.png").exists(), "已替换的临时第二皮肤不应继续打包"
+    assert set(sources) == {"wallpaper-day.png", "wallpaper-night.png", "wallpaper-sun.png", "wallpaper-moon.png", "app-icon-source.png"}
+    bundled = {entry["file"] for entry in manifest["assets"]}
+    assert bundled == {*sources, "wallpaper-day-header.png", "wallpaper-night-header.png", "app-icon.png", "app-icon.ico"}
+    assert {p.name for p in ASSET_DIR.iterdir() if p.suffix in {".png", ".ico"}} == bundled, "资源目录混入未登记或旧角色素材"
+    assert not (ASSET_DIR / "character-provenance.json").exists()
+    runtime = "\n".join((Path(app.__file__).parent / name).read_text(encoding="utf-8") for name in ("app.py", "character_theme.py", "quick_theme.py", "tools/build_ui_art.py"))
+    runtime += "\n".join(path.read_text(encoding="utf-8") for path in Path(app.__file__).parent.glob("*.qml"))
+    for retired in ("character.png", "character-sticker.png", "wallpaper-studio.png", "wallpaper-sky.png",
+                    "wallpaper-orbits.png", "wallpaper-ice-", "羽啾的切片工作台", "羽啾 · 薄荷", "冰蓝 · 蝶影"):
+        assert retired not in runtime, ("旧皮肤仍有运行时引用", retired)
     for source in sources.values():
         assert source["model"] in {"gpt-image-2.5-flare", "gpt-image-2.5-sunburst"}
         assert source["task_id"].startswith("img_")
-        assert bool(source["references"]) == (source["file"] != "app-icon-source.png"), "通用图标应独立生成，不使用角色参考图"
+        assert source["references"] == [], "新皮肤和通用图标必须独立生成，不使用角色参考图"
         assert hashlib.sha256((ASSET_DIR / source["file"]).read_bytes()).hexdigest() == source["sha256"]
-        if source["file"].startswith("wallpaper-ice-"):
-            assert any(reference["sha256"] == "849be2b55d20084998a12b1973618a49a59ca42be3576a5f3e9ef4099d59e49b" for reference in source["references"]), "第二皮肤必须使用用户本次提供的角色"
+        if source["file"].startswith("wallpaper-"):
             with app.Image.open(ASSET_DIR / source["file"]) as image:
                 assert image.width >= 1800 and image.height >= 600
                 assert image.convert("RGBA").getchannel("A").getextrema() == (255, 255)
+    from quick_theme import SKINS
+    for key, character in (("day", "sun"), ("night", "moon")):
+        skin = SKINS[key]
+        assert skin["scene"] == f"wallpaper-{character}.png" and skin["sceneFit"]
+        assert skin["header"] == f"wallpaper-{key}-header.png", "只更换工作台，保留地貌页头"
+        with app.Image.open(ASSET_DIR / skin["scene"]) as image:
+            assert image.size == (2048, 768), "180px横幅中的人物比例依赖原图尺寸"
+            background = bytes.fromhex(skin["sceneBackground"][1:])
+            mean = ImageStat.Stat(image.crop((0, 0, 980, 768))).mean
+            assert tuple(round(channel) for channel in mean) == tuple(background), "横幅补白必须匹配人物图片的实际背景色"
+            for box, message in (((0, 0, 980, 768), "人物或装饰侵入左侧阅读留白"),
+                                 ((980, 0, 2048, 64), "人物发顶或配饰缺少完整显示的顶部留白")):
+                for limits, value in zip(image.convert("RGB").crop(box).getextrema(), background):
+                    assert all(abs(edge - value) <= 8 for edge in limits), message
+            assert any(high - low > 100 for low, high in image.crop((1200, 0, 2048, 768)).getextrema()), "右侧人物图像缺失"
     for entry in manifest["assets"]:
         path = ASSET_DIR / entry["file"]
         assert hashlib.sha256(path.read_bytes()).hexdigest() == entry["sha256"], (path.name, "stale provenance")
@@ -2171,12 +2188,6 @@ def assert_character_art_assets() -> None:
                     assert image.ico.getimage((256, 256)).convert("RGBA").tobytes() == png.convert("RGBA").tobytes(), "EXE 与窗口图标不一致"
             else:
                 assert image.info["impeccable:prompt"] == sources[entry["derived_from"]]["prompt"]
-    with app.Image.open(ASSET_DIR / "character-sticker.png") as sticker:
-        # The generated portrait is intentionally opaque; never claim a checkerboard is alpha.
-        assert sticker.size == (1024, 1024)
-        assert sticker.convert("RGBA").getchannel("A").getextrema() == (255, 255)
-        corner = sticker.convert("RGB").crop((0, 0, 70, 70))
-        assert all(lo >= 240 and hi - lo < 12 for lo, hi in corner.getextrema()), "avatar background acquired a checkerboard"
     with app.Image.open(ASSET_DIR / "app-icon.png") as icon:
         assert icon.size == (256, 256)
         assert icon.getchannel("A").getextrema() == (0, 255)
@@ -2184,24 +2195,24 @@ def assert_character_art_assets() -> None:
     with app.Image.open(ASSET_DIR / "app-icon-source.png") as source:
         assert source.size == (1024, 1024)
         assert source.convert("RGBA").getchannel("A").getextrema() == (255, 255), "图标原图存在透明杂边"
-    with app.Image.open(ASSET_DIR / "wallpaper-studio.png") as image:
+    with app.Image.open(ASSET_DIR / "wallpaper-day.png") as image:
         assert image.size == (2048, 768)
         wide = wallpaper_image(image, (1200, 220), SURFACE)
         narrow = wallpaper_image(image, (680, 220), SURFACE)
-        assert narrow.tobytes() == wide.crop((520, 0, 1200, 220)).tobytes(), "resize moved or stretched the character"
+        assert narrow.tobytes() == wide.crop((520, 0, 1200, 220)).tobytes(), "resize moved or stretched the landscape"
         expected = tuple((value, value) for value in bytes.fromhex(SURFACE[1:]))
         assert wide.crop((0, 0, 610, 220)).getextrema() == expected, "wallpaper obscured native text"
-        assert wide.crop((1000, 0, 1200, 220)).getextrema() != expected, "character image was washed away"
+        assert wide.crop((1000, 0, 1200, 220)).getextrema() != expected, "landscape image was washed away"
         for width in (800, 980):
             hero = wallpaper_image(image, (width, 220), SURFACE, fill_width=True)
             intro_right = 24 + max(440, width // 2) - 48
             assert hero.crop((0, 0, intro_right, 220)).getextrema() == expected, "reading scrim missed native controls"
             assert hero.crop((width - 200, 0, width, 220)).getextrema() != expected, "hero scene missing at desktop width"
-    with app.Image.open(ASSET_DIR / "wallpaper-orbits.png") as image:
+    with app.Image.open(ASSET_DIR / "wallpaper-day-header.png") as image:
         for background in (SURFACE, RAIL, app.UI_COLORS["bg"]):
             result = wallpaper_image(image, (960, 58), background)
             assert result.getpixel((0, 0)) == tuple(bytes.fromhex(background[1:])), "header lost readable host color"
-    print(f"Generated art checks passed: {len(sources)} originals, {len(manifest['assets'])} assets, generic app icon, ICO/PNG pixel parity, opaque avatar and readable scaling")
+    print(f"Generated art checks passed: {len(sources)} reference-free originals, {len(manifest['assets'])} assets, ICO/PNG parity, readable scaling and no retired character resources")
 
 
 def assert_desktop_polish(output_dir: Path | None = None) -> None:
@@ -2222,7 +2233,7 @@ def assert_desktop_polish(output_dir: Path | None = None) -> None:
                 assert not errors, errors
                 if output_dir:
                     root.title("角色主题界面检查（测试数据）")
-                assert root._ui_art["character-sticker.png"].width == 1024 and desktop._character_avatar.width() == 42
+                assert root._ui_art["app-icon.png"].width == 256 and desktop._character_avatar.width() == 42
                 assert root._window_icon.width() == 256 and root._empty_art.width() == 64
                 assert desktop.character_art.winfo_ismapped() and desktop.character_art.find_all()
                 style = app.ttk.Style.get_instance()

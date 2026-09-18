@@ -33,25 +33,21 @@ def build():
         image.save(ASSETS / name, pnginfo=metadata, optimize=True)
         record(name, usage, source, recipe)
 
-    for name, usage in (("wallpaper-studio.png", ["工作台角色场景壁纸"]),
-                        ("wallpaper-sky.png", ["独立天空壁纸", "页头背景来源"]),
-                        ("character-sticker.png", ["顶栏头像", "列表空态"]),
-                        ("app-icon-source.png", ["通用视频录制、剪辑与上传图标原图"]),
-                        ("wallpaper-ice-studio.png", ["冰蓝蝶影皮肤角色壁纸"]),
-                        ("wallpaper-ice-sky.png", ["冰蓝蝶影皮肤蝴蝶纹样页头原图"])):
+    for name, usage in (("wallpaper-day.png", ["极昼地貌页头来源", "旧Tk工作台"]),
+                        ("wallpaper-night.png", ["黑夜地貌页头来源"]),
+                        ("wallpaper-sun.png", ["极昼工作台太阳娘壁纸"]),
+                        ("wallpaper-moon.png", ["黑夜工作台月亮娘壁纸"]),
+                        ("app-icon-source.png", ["通用视频录制、剪辑与上传图标原图"])):
+        assert sources[name]["references"] == [], "Bundled artwork must not depend on character references."
         assert hashlib.sha256((ASSETS / name).read_bytes()).hexdigest() == sources[name]["sha256"]
         record(name, usage)
 
-    with Image.open(ASSETS / "wallpaper-sky.png") as source:
-        # A viewport crop, not a new illustration or a claimed alpha matte.
-        banner = ImageOps.fit(source.convert("RGB"), (1800, 300), centering=(1.0, 0.34))
-    save("wallpaper-orbits.png", banner, "wallpaper-sky.png", ["七页页头", "导航底部"],
-         "Proportional 1800x300 viewport crop of sky wallpaper, vertical center 0.34; no painted content added.")
-
-    with Image.open(ASSETS / "wallpaper-ice-sky.png") as source:
-        banner = ImageOps.fit(source.convert("RGB"), (1800, 300), centering=(1.0, 0.5))
-    save("wallpaper-ice-header.png", banner, "wallpaper-ice-sky.png", ["冰蓝蝶影皮肤页头"],
-         "Proportional 1800x300 center crop of the generated butterfly wallpaper; original pixels retained without painted additions.")
+    for key in ("day", "night"):
+        name = f"wallpaper-{key}.png"
+        with Image.open(ASSETS / name) as source:
+            banner = ImageOps.fit(source.convert("RGB"), (1800, 300), centering=(1.0, 0.5))
+        save(f"wallpaper-{key}-header.png", banner, name, ["页头背景"],
+             "Proportional 1800x300 center crop of the original terrain; no painted content added.")
 
     with Image.open(ASSETS / "app-icon-source.png") as source:
         assert source.size == (1024, 1024)
@@ -62,7 +58,7 @@ def build():
     ImageDraw.Draw(mask).rounded_rectangle((8, 8, 759, 759), radius=164, fill=255)
     icon.putalpha(mask)
     icon = icon.resize((256, 256), Image.Resampling.LANCZOS)
-    save("app-icon.png", icon, "app-icon-source.png", ["窗口图标", "侧栏应用标识"],
+    save("app-icon.png", icon, "app-icon-source.png", ["窗口图标", "侧栏应用标识", "旧版顶栏和列表空态"],
          "Proportional generic video-tool icon resize with rounded application-tile corners; solid background retained.")
     icon.save(ASSETS / "app-icon.ico", format="ICO", sizes=[(n, n) for n in (16, 24, 32, 48, 64, 128, 256)])
     record("app-icon.ico", ["Windows EXE 图标"], "app-icon-source.png", "Seven ICO sizes derived from app-icon.png.")

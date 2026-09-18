@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.impl
 
 ComboBox {
     id: control
@@ -7,6 +8,7 @@ ComboBox {
     padding: 6
     rightPadding: 30
     palette.mid: uiTheme.current.colors.choicePressed
+    palette.buttonText: enabled ? uiTheme.current.colors.ink : uiTheme.current.colors.disabledInk
     background: Rectangle {
         radius: 10
         color: !control.enabled ? uiTheme.current.colors.disabled : control.down ? uiTheme.current.colors.choicePressed : uiTheme.current.colors.surface
@@ -14,12 +16,13 @@ ComboBox {
         border.width: control.activeFocus ? 2 : 1
         Behavior on color { ColorAnimation { duration: bridge.motionEnabled && !uiTheme.transitioning ? 110 : 0 } }
     }
-    indicator: Image {
+    indicator: IconImage {
+        objectName: control.objectName + "Indicator"
         source: artRoot + "icons/chevron-down.svg"
         width: 16; height: 16
         x: control.width - width - 10
         y: (control.height - height) / 2
-        opacity: control.enabled ? 0.65 : 0.3
+        color: control.enabled ? uiTheme.current.colors.ink : uiTheme.current.colors.disabledInk
         rotation: control.popup.visible ? 180 : 0
         Behavior on rotation { NumberAnimation { duration: bridge.motionEnabled && !uiTheme.transitioning ? 150 : 0; easing.type: Easing.OutCubic } }
     }

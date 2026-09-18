@@ -2,48 +2,6 @@
   "provider": "https://task-api-1-cn.65535.space",
   "sources": [
     {
-      "file": "wallpaper-studio.png",
-      "task_id": "img_8ef2ab84394f76db9ef4cc816719a900",
-      "model": "gpt-image-2.5-sunburst",
-      "prompt": "Generate one premium anime illustration wallpaper for a desktop video creator application, wide horizontal 8:3 composition. The supplied character design sheet is an identity reference, not a layout reference. Faithfully keep her recognizable silver-white hair with pale pistachio green tips, black rectangular eyeglasses, gentle lavender-blue eyes, orbit antenna with a tiny yellow star, blue and green planet shoulder ornaments, white oversized shirt with blue trim. A warm, quiet, thoughtful expression, seated by an open circular observation window, holding a small mint notebook. Place the character's head and upper body ONLY in the rightmost 30 percent, fully inside the frame with generous top margin; a delicate pale blue-green ringed planet beyond her and a few very small champagne stars. Airy hand-painted anime key visual, delicate linework, sophisticated silver-white, ice blue, mist lavender, soft mint color script; gentle daylight, elegant restraint, layered clouds and translucent curved orbital ribbons on the right. The LEFT 60 percent is almost perfectly uniform porcelain white #F6F8FC, completely empty calm negative space reserved for readable native UI text, melting softly into the illustrated sky on the right. No lettering, no writing on clothes, no labels, no watermark, no UI widgets, no grids, no collage, no repeated characters. All-ages character styling, focus on face and shoulders. A complete coherent new illustration, not the design sheet pasted over a background.",
-      "references": [
-        {
-          "path": "2b4d793e0b27fec74af8c335113d21a0_720.jpg",
-          "sha256": "355fe4c72b3eb19269b24df11d8cbb7e029fa39910c142ec37b03e6ed6bb1345"
-        }
-      ],
-      "sha256": "6a4dbe93f85fe6d5495ace4636b20666e3e3ad44eca11d9216af5d171a3a34f6",
-      "download_sha256": "9b8b92ff8d55079b443bb8563cf9ef11d1c60782910706e4e2d274c3b25f4721"
-    },
-    {
-      "file": "wallpaper-sky.png",
-      "task_id": "img_af5c0434c3ec358949f38a7555a82255",
-      "model": "gpt-image-2.5-flare",
-      "prompt": "Create one exquisite ambient wallpaper, 16:9 horizontal illustration, for a silver mint anime character's creative studio application. The supplied design sheet is ONLY the palette and motif reference: silver-white hair, pale green ends, pastel blue-green planet ornaments, delicate orbits and one small warm yellow star. Do not draw the character or any person. Dreamlike but restrained celestial daylight above soft clouds, an airy pale blue and mist lavender sky, a large glasslike water-blue planet and a pale pistachio green moon with graceful fine elliptical orbit ribbons concentrated along the right edge and upper right. Broad nearly white central-left negative space, nuanced light, fine anime background painting, editorial precision, rich atmospheric depth without visual noise. Palette porcelain #F6F8FC, cool lilac #E8EAF5, ice blue #DCEAF4, pale mint #DCEEE6, ink-blue details extremely sparse, tiny champagne star accents. Subdued contrast so content panels remain legible. Full-bleed continuous environment, no border, no text, no letters, no numbers, no watermark, no user interface, no charts or grid.",
-      "references": [
-        {
-          "path": "2b4d793e0b27fec74af8c335113d21a0_720.jpg",
-          "sha256": "355fe4c72b3eb19269b24df11d8cbb7e029fa39910c142ec37b03e6ed6bb1345"
-        }
-      ],
-      "sha256": "814e80765431b24c27cb950c954331a0f0db2455ed39396b23b19ce8796a7242",
-      "download_sha256": "2b7daee50a2b8e85f9f8657b3e8008625c3191033600202dbaa958116084fc3d"
-    },
-    {
-      "file": "character-sticker.png",
-      "task_id": "img_e70ae1ec7b08b196dc6b2d196605c2c4",
-      "model": "gpt-image-2.5-flare",
-      "prompt": "Edit the supplied chibi character portrait. Preserve the exact identity, eyes, glasses, white and mint hair, blue and green planet ornaments, soft linework and colors. Completely replace ALL of the grey checkerboard background, including gaps between antennae and hair, with a clean opaque uniform porcelain near-white #F6F8FC. There must be absolutely no grid, checkerboard, texture, noise, letters or watermark anywhere in the output. Reduce the whole character uniformly to 76 percent of the frame width and height and center it, so every antenna tip and every strand has comfortable clean near-white margin on all four edges. This is a square APP ICON portrait with a solid colored background, NOT a transparent sticker. Do not simulate transparency. Keep the warm gentle expression, one character only. Output a crisp polished illustrated app avatar.",
-      "references": [
-        {
-          "path": "img_05aabd1249227c22d692592534bd1d28-1.png",
-          "sha256": "7b9b61898db3bf6ff61eec4fb4da08e220e0c71b92b8a96835dab3def10948f2"
-        }
-      ],
-      "sha256": "0d26381209fb68fdca0834225764471d0cf321c956397df38adf65e4670a424e",
-      "download_sha256": "d39304df1418b32af6e0b1117ddb70e502489746f45cd2d03571983d179a0a57"
-    },
-    {
       "file": "app-icon-source.png",
       "request_id": "liveclip-generic-icon-20260916-v2",
       "task_id": "img_854ce630f8e30602fad90ee462197f6a",
@@ -52,72 +10,61 @@
       "background": "opaque",
       "prompt": "Use case: logo-brand. Asset type: the actual Windows desktop application icon for a general-purpose livestream recording, clip editing and video upload utility, not a mockup. Create one crisp professional, universally recognizable video-creator icon. A large white video frame with a bold right-facing play triangle forms the main silhouette; a clean diagonal cut through part of the frame suggests trimming a video clip; integrate a bold upward upload arrow with the frame's upper-right edge. One small coral-red recording dot supplies the live-recording cue. Combine these familiar symbols into one coherent compact mark, not a row of separate icons. Flat vector-like raster artwork, optical balance, very few solid shapes, thick clean geometry and ample separation so the mark remains recognizable at 16, 24, 32 and 48 pixels. Quiet teal-blue full-bleed opaque solid background, high-contrast white main mark, restrained mint accent and red record dot. The background color fills every pixel to all four straight square edges; software will round the tile corners later. Center the complete mark in the inner 76 percent of this square canvas. No people, faces, anime, mascots, stars, planets, letters, words, numbers, brand logos, borders, decorative scenes, checkerboards, drop shadows, 3D, gradients, textures or watermark. One final standalone icon, front view, 1:1. The image must be fully opaque with a clean solid teal-blue background, including the open space inside the video frame. Do not remove or key out the background.",
       "references": [],
-      "sha256": "548b2c4c74e4b244dba3b528673fe250d36f107e979ef3e9a57ef63f2342c4e8"
+      "sha256": "6c29a4bc572e077585bdee268795543ced2508f17a4dd1c2ee16e155cb79326a",
+      "download_sha256": "548b2c4c74e4b244dba3b528673fe250d36f107e979ef3e9a57ef63f2342c4e8",
+      "metadata_note": "Exact prompt stored before PNG pixel data for portable readers; decoded pixels unchanged."
     },
     {
-      "file": "wallpaper-ice-studio.png",
-      "request_id": "liveclip-ice-character-20260917-v2",
-      "task_id": "img_5f2e65d834965fcb77aba70260ce5d88",
+      "request_id": "streamclip-polar-day-20260918-v1",
+      "task_id": "img_e39af1b211e321a3668fa1576cbc716d",
       "model": "gpt-image-2.5-flare",
       "size": "2048x768",
       "background": "opaque",
-      "prompt": "Use case: identity-preserve. Image 1 is the existing wallpaper to edit; image 2 is the original character identity reference. Correct ONLY the composition of image 1 for a shallow desktop application banner. The current character is much too large and the top of her hair is cut off. Reduce the ENTIRE character uniformly to about 55 percent of her present scale, keep her on the far right and center her vertically, and extend the same calm pale daylight background around her. This is a zoom-out of the subject, NOT cropping. Make her entire head, complete white bow accessories and ponytail top visible between y=245 and y=445 of a 2048x768 image, with her face near x=1700, y=370. Let her visible chest and jacket continue to y=560; all important character content is inside the central horizontal strip from y=230 to y=560. Keep everything ABOVE y=200 and BELOW y=600 background only. Head should be small in the full image because only the central horizontal strip is shown by the software. The character must occupy only the rightmost quarter. Preserve her exact face, her amber-gold viewer-left eye and cyan-blue viewer-right eye, blue hair with lilac ends, white bow-like ear-shaped head accessories and narrow frilled band, hair clips, gentle expression, black choker, white collared shirt, navy striped tie, small gold badge and ice-blue butterfly embroidered jacket. No eyeglasses. Keep the left 68 percent nearly uniform cool white #F5F7FB for native UI text. Keep the existing refined anime painting style, pale sky-blue window-light background and very subtle lilac ribbon at the right. One person only. No text, watermark, UI, framing, other characters, planets, dark background, collage, borders or checkerboard. Fully opaque. The key change is a MUCH SMALLER character fully inside the central horizontal band, with broad calm background above and below; do not return the same close-up.",
-      "references": [
-        {
-          "path": "img_214e8c4189df2fc0f768c0eaaf73a5c0-1.png",
-          "sha256": "4c1aa3ddb47a7533359dcc6de707d8d510df4d3cd1b1146b3c2e363ebe867a1e"
-        },
-        {
-          "path": "canvas-image-wHfCbX6TDHVhWs7E16EOx.png",
-          "sha256": "849be2b55d20084998a12b1973618a49a59ca42be3576a5f3e9ef4099d59e49b"
-        }
-      ],
-      "sha256": "2d71a77be9a3d6d26cf2d08ee3e4387e922c0c044dc097b4a0b1910acfc30ac2",
-      "composition_source": {
-        "request_id": "liveclip-ice-character-20260917-v1",
-        "task_id": "img_214e8c4189df2fc0f768c0eaaf73a5c0",
-        "model": "gpt-image-2.5-flare",
-        "prompt": "Use case: stylized-concept. Asset type: production wallpaper behind a native desktop video-editing workbench. Input image 1 is ONLY the character identity and outfit reference, not a layout to copy. Create one polished, beautifully drawn horizontal anime key visual in an airy daylight studio beside a pale sky-lit window. One character only, facing gently toward the viewer, head and shoulders on the RIGHTMOST 27 percent of the image. Faithfully preserve the reference identity: long cornflower and ice-blue hair turning softly lilac at the ends, swept bangs, high tied ponytail, large white bow-like ear-shaped head accessories on a narrow white frilled band, delicate white cross/star hair clips, heterochromia with viewer-left eye amber gold and viewer-right eye bright cyan blue, black choker, white collared shirt with dark navy striped tie and small gold school badge, loose ice-blue jacket with blue and white butterfly embroidery. No glasses. No planet ornaments. Gentle composed expression, natural all-ages portrait, elegant fine linework and soft clean cel shading. Her COMPLETE head and white accessories should fit within the middle 56 percent of image height, face center at x 84 percent / y 48 percent, leaving generous headroom and safe bottom margin because the UI crops the top and bottom into a shallow banner. Show shoulders and jacket motifs clearly; no full body and no legs. The LEFT 64 percent must be nearly uniform cool porcelain white #F5F7FB with no props, figures, lettering or strong edges, reserved for dark native UI text and buttons. Soft pale blue daylight and one subtle lilac fabric ribbon can occupy the right edge only. Quiet silver-white background, fresh ice blue main color, small lilac accents and tiny gold detail from her badge and eye. Do not add extra people, glasses, moons, planets, sci-fi rings, watermarks, words, numbers, UI, borders, collage, design-sheet views, floating light blobs or checkerboard. Fully opaque real illustration, not a screenshot of a UI and not the reference sheet pasted over a background. Preserve the eye colors exactly. High-quality finished raster wallpaper.",
-        "size": "2048x768",
-        "quality": "auto",
-        "background": "opaque",
-        "references": [
-          {
-            "path": "canvas-image-wHfCbX6TDHVhWs7E16EOx.png",
-            "sha256": "849be2b55d20084998a12b1973618a49a59ca42be3576a5f3e9ef4099d59e49b"
-          }
-        ],
-        "images": [
-          {
-            "path": "img_214e8c4189df2fc0f768c0eaaf73a5c0-1.png",
-            "width": 2048,
-            "height": 768,
-            "format": "PNG",
-            "has_transparency": false,
-            "sha256": "4c1aa3ddb47a7533359dcc6de707d8d510df4d3cd1b1146b3c2e363ebe867a1e"
-          }
-        ],
-        "warnings": [],
-        "resolution": null,
-        "provider": "https://task-api-1-cn.65535.space",
-        "model_reported_by_provider": "gpt-image-2.5-flare"
-      }
+      "prompt": "Create an original finished raster wallpaper for a quiet professional desktop editing application. Very wide 8:3 composition, 2048x768. Theme: polar daylight, sculpted white snow terrain. An elegant high-key monochrome landscape of a few long smooth snow ridges, clean porcelain-white planes and soft neutral silver-gray shadows, carefully art-directed aerial photography-like landscape, tangible gentle contours with fine natural surface detail only on the far right. The LEFT 66 percent must be calm almost uniform near-white #FAFAFA, empty and bright, reserved for dark native interface labels. Place the distinct terrain folds only in the RIGHTMOST THIRD, their main ridges inside the middle vertical band so they survive a shallow 180px banner crop; sweeping sideways rather than tall peaks. No blue or beige cast. Crisp purposeful image, no fog, blur or excessive fine noise. Restrained, spacious, pristine, not a UI mockup. Original invented geography, not a recognizable location. Do not draw people, characters, mascots, animals, buildings, clothing, butterflies, stars, sun or moon disks, planets, orbs, bokeh, logos, text, watermarks, frames, UI widgets, checkerboards, decorative gradients or a collage. Fully opaque image. No external reference, no named artist imitation.",
+      "references": [],
+      "file": "wallpaper-day.png",
+      "sha256": "9811e8445122d8e50b6c875048a91dc5d70e38bbdb4b7926d706dbf91344305b",
+      "download_sha256": "0fe35e8a208714907c7f1eeb93a337bca2f7651629adecbf639175fbb74ee85e",
+      "metadata_note": "Exact prompt stored before PNG pixel data for portable readers; decoded pixels unchanged."
     },
     {
-      "file": "wallpaper-ice-sky.png",
-      "request_id": "liveclip-ice-butterfly-header-20260917-v1",
-      "task_id": "img_e424cc062be124d8e9423c703324660f",
+      "request_id": "streamclip-polar-night-20260918-v1",
+      "task_id": "img_c782795921a4337146e7a32741883c31",
       "model": "gpt-image-2.5-flare",
       "size": "2048x768",
       "background": "opaque",
-      "prompt": "Use case: stylized-concept. Asset type: quiet production page-heading wallpaper for a desktop creator application, a very wide horizontal banner. Input image 1 is ONLY a palette and ornament reference. Do NOT draw the character, faces, people, bodies or clothing laid out as objects. Translate her ice-blue jacket, white butterfly embroidery, lilac hair tips and small gold badge detail into an elegant light anime background painting. The LEFT 70 percent is calm nearly uniform porcelain white #F5F7FB reserved for dark page titles. At the far RIGHT, create a restrained airy arrangement of only a few delicate blue and white embroidered butterfly motifs and one flowing pale lilac satin ribbon in soft daylight, with tiny champagne-gold stitch details. Motifs are inspired by the actual jacket embroidery, not insects in a landscape. Use crisp refined painted edges and generous open space, subtle textile detail only on the motifs, no noise. Keep the main motif arrangement at the horizontal centerline so it remains legible when cropped into a shallow page-heading strip. Primarily silver-white and ice blue, a little lilac, tiny warm gold. No gradient blobs, bokeh, orbs, planets, moons, orbital rings, grids, text, labels, letters, UI controls, logos, watermarks, frames, collage or checkerboard. No dark region. One coherent finished continuous opaque illustration, not vector art or a UI mockup.",
-      "references": [
-        {
-          "path": "canvas-image-wHfCbX6TDHVhWs7E16EOx.png",
-          "sha256": "849be2b55d20084998a12b1973618a49a59ca42be3576a5f3e9ef4099d59e49b"
-        }
-      ],
-      "sha256": "28ece43199a1e4a5ef4fbcd1ec0829a6131b7ec33d570b0df2824b805b0d5496"
+      "prompt": "Create an original finished raster wallpaper for a quiet professional desktop editing application. Very wide 8:3 composition, 2048x768. Theme: black night, sculpted obsidian terrain. An elegant low-key monochrome landscape of a few long rolling graphite rock ridges, matte charcoal planes with subtle soft silver edge-light, carefully art-directed photography-like terrain, tactile smooth geology with fine natural surface detail only on the far right. The LEFT 66 percent must be calm almost uniform charcoal black #202122, empty and very dark, reserved for bright native interface labels. Place the distinct terrain folds only in the RIGHTMOST THIRD, their main ridges inside the middle vertical band so they survive a shallow 180px banner crop; sweeping sideways rather than tall peaks. Ridges should remain clearly visible as layered dark gray surfaces without bright white highlights. No navy or purple cast, no neon. Crisp purposeful image, no fog, blur or excessive fine noise. Restrained, spacious, precise, not a UI mockup. Original invented geography, not a recognizable location. Do not draw people, characters, mascots, animals, buildings, clothing, butterflies, stars, sun or moon disks, planets, orbs, bokeh, logos, text, watermarks, frames, UI widgets, checkerboards, decorative gradients or a collage. Fully opaque image. No external reference, no named artist imitation.",
+      "references": [],
+      "file": "wallpaper-night.png",
+      "sha256": "d9bb6522df57eaf8780a0a3f8841f2d378f70568e0f0d22d73b213ab0496b706",
+      "download_sha256": "27e27022d99adaa8d3e1773d587bd46e6183f5ee83d351fb86e991dfade406bf",
+      "metadata_note": "Exact prompt stored before PNG pixel data for portable readers; decoded pixels unchanged."
+    },
+    {
+      "request_id": "streamclip-sun-anime-girl-20260918-v3",
+      "task_id": "img_73c2775daa516dc9ba6d30f2fcfc635a",
+      "model": "gpt-image-2.5-flare",
+      "size": "2048x768",
+      "background": "opaque",
+      "prompt": "Use case: stylized-concept. Make an original wide wallpaper with a SMALLER, fully framed anime SUN GIRL bust on the far right and very generous blank space everywhere else. FRAMING FIRST: 2048x768 canvas, opaque flat #FAFAFA ground. Left 55 percent of the canvas is totally blank flat #FAFAFA. The girl occupies only the rightmost third of the canvas. Leave a BROAD VISIBLE BAND of empty background above the entire head, at least one fifth of the image height; the crown must begin below y=150. Leave blank margins at both sides of the girl too. Show the entire crown, all hair accessories, head, shoulders and upper torso, with lower torso exiting the bottom edge. Do NOT enlarge the face to fill the canvas height. DO NOT CROP OR TOUCH THE TOP OF HER HAIR. A spacious composition, not a tight close-up. Her head including hair is about 340 pixels tall, small enough to fit with abundant air above. Girl centered around x=1600. Flat empty background behind her as well, no halo, no landscape. Style: unmistakable cute Japanese 2D anime shoujo character, large sparkling amber eyes, rounded youthful cheeks, small chin, a tiny one-stroke nose, tiny cheerful open smile. Bold clear outline, simple graphic shapes, flat colors and two-tone hard-edged cel shading, attractive polished television anime key art rather than a realistic illustration. Pale golden-blonde fluffy bangs and loose short twin ponytails with white ribbons, a little gold sun-shaped hair clip. Modest white sailor-collar blouse and white capelet with gold trim, coral bow and simple sun badge. No cleavage, no exposed torso, no hands. Bright, friendly anime girl, not a mature woman, not a queen, not chibi. Avoid realistic eyes, realistic nose and lips, skin texture, painted strands, painterly rendering, airbrushed shading, 3D lighting, elaborate jewelry. Keep warm color on the character only. One entirely original character, no existing anime or VTuber identity, no artist imitation, no reference images. No text, logo, watermark, border, UI, gradients, particles or background ornaments. Remember the most important composition rule: a substantial EMPTY TOP MARGIN above the complete head, unlike a cropped anime close-up.",
+      "references": [],
+      "file": "wallpaper-sun.png",
+      "sha256": "5e841c6bd5840a80fd2fdf848e04d7c881d0c657274e4e687a9169029de70b2a",
+      "download_sha256": "92dc05036e541f262fa31be15d106da60ecca637f2f6f9f1ec641e4dc1a47317",
+      "metadata_note": "Exact prompt embedded before PNG pixel data; decoded pixels unchanged."
+    },
+    {
+      "request_id": "streamclip-moon-anime-girl-20260918-v3",
+      "task_id": "img_6e783837b610dbc02117bc2bf4ede591",
+      "model": "gpt-image-2.5-flare",
+      "size": "2048x768",
+      "background": "opaque",
+      "prompt": "Use case: stylized-concept. Make an original wide wallpaper with a SMALLER, fully framed anime MOON GIRL bust on the far right and very generous blank space everywhere else. FRAMING FIRST: 2048x768 canvas, opaque flat #202122 ground. Left 55 percent of the canvas is totally blank flat #202122. The girl occupies only the rightmost third of the canvas. Leave a BROAD VISIBLE BAND of empty background above the entire head, at least one fifth of the image height; the crown must begin below y=150. Leave blank margins at both sides of the girl too. Show the entire crown, all hair accessories, head, shoulders and upper torso, with lower torso exiting the bottom edge. Do NOT enlarge the face to fill the canvas height. DO NOT CROP OR TOUCH THE TOP OF HER HAIR. A spacious composition, not a tight close-up. Her head including hair is about 340 pixels tall, small enough to fit with abundant air above. Girl centered around x=1600. Flat empty background behind her as well, no halo, no landscape. Style: unmistakable cute Japanese 2D anime shoujo character, large clear ice-blue eyes, rounded youthful cheeks, small chin, a tiny one-stroke nose, tiny gentle smile. Bold clear outline, simple graphic shapes, flat colors and two-tone hard-edged cel shading, attractive polished television anime key art rather than a realistic illustration. Silver-white long hair, rounded soft bangs and small side locks tied with black ribbons, a little silver crescent hair clip. Modest black sailor-collar dress and charcoal capelet, white collar with silver trim, muted ice-blue bow and simple crescent badge. No cleavage, no exposed torso, no hands. Quiet, slightly shy and friendly anime girl, not a mature woman, not a queen, not chibi. Avoid realistic eyes, realistic nose and lips, skin texture, painted strands, painterly rendering, airbrushed shading, 3D lighting, elaborate jewelry. Keep the background neutral charcoal, not navy or purple. One entirely original character, no existing anime or VTuber identity, no artist imitation, no reference images. No text, logo, watermark, border, UI, gradients, particles or background ornaments. Remember the most important composition rule: a substantial EMPTY TOP MARGIN above the complete head, unlike a cropped anime close-up.",
+      "references": [],
+      "file": "wallpaper-moon.png",
+      "sha256": "49fe4613b212cb50b0604a02e35860c46b7d1910872c9f554301086b63bf435c",
+      "download_sha256": "5cd100473ade412155def5cc29d842c272a330d9a7daf7f039ce032dd44c2c7f",
+      "metadata_note": "Exact prompt embedded before PNG pixel data; decoded pixels unchanged."
     }
   ]
 }

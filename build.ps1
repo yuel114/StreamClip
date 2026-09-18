@@ -69,8 +69,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $built = Join-Path $distRoot $outputName
-# Verify shipped QML, not just the source tree, before replacing the user's EXE.
-& $taskPython -c "import sys; from pathlib import Path; from PyInstaller.archive.readers import CArchiveReader; archive = CArchiveReader(sys.argv[1]); sources = list(Path(sys.argv[2]).glob('*.qml')); assert sources; [None if archive.extract(source.name) == source.read_bytes() else sys.exit('Packaged QML differs: ' + source.name) for source in sources]; print('Packaged QML matches source')" $built $appRoot
+# Verify every shipped visual resource, including absence of retired artwork.
+& $taskPython -c "import sys; from pathlib import Path; from PyInstaller.archive.readers import CArchiveReader; archive = CArchiveReader(sys.argv[1]); root = Path(sys.argv[2]); sources = [*root.glob('*.qml'), *(p for p in (root / 'assets/ui').rglob('*') if p.is_file())]; expected = {str(p.relative_to(root)).replace('/', '\\') for p in sources}; actual = {n.replace('/', '\\') for n in archive.toc if n.replace('\\', '/').startswith('assets/ui/') or n.endswith('.qml') and '/' not in n.replace('\\', '/')}; assert expected == actual, (expected - actual, actual - expected); [None if archive.extract(str(p.relative_to(root))) == p.read_bytes() else sys.exit('Packaged resource differs: ' + p.name) for p in sources]; print('Packaged QML and artwork match source')" $built $appRoot
 if ($LASTEXITCODE -ne 0) { throw 'Executable QML verification failed.' }
 $check = Start-Process -FilePath $built -ArgumentList '--self-test' -WindowStyle Hidden -PassThru
 if (-not $check.WaitForExit(120000)) { $check.Kill($true); throw 'Executable self-test timed out.' }

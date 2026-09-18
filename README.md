@@ -2,7 +2,13 @@
 
 Windows 桌面端 Bilibili 直播切片工作台，使用 Python、PySide6 / Qt Quick 和 FFmpeg。
 
-> 源码使用 GPLv3；角色皮肤的公开再分发授权尚未取得，不包含在代码授权声明中。详细来源及权利状态见 [素材权利说明](assets/ui/ASSET_RIGHTS.md)。
+> 源码使用 GPLv3。当前日夜主题使用无外部参考的 AI 生成素材，旧版第三方角色图片已从当前版本移除；生成记录不代表第三方权利保证。详细来源及说明见 [素材权利说明](assets/ui/ASSET_RIGHTS.md)。
+
+## 下载
+
+Windows x64 版本见 [GitHub Releases](https://github.com/yuel114/StreamClip/releases/latest)。解压后运行 `StreamClip.exe`，无需安装 Python；FFmpeg、FFprobe 和 yt-dlp 需自行配置，见下方运行要求。
+
+升级前关闭旧程序，将新程序与已有 `data/` 放在同一目录，并保留原媒体工具及配置；不要用空数据目录覆盖已有数据。旧主题偏好会兼容映射到新主题，账号、录播、任务及业务设置沿用。
 
 ## 功能
 
@@ -13,12 +19,14 @@ Windows 桌面端 Bilibili 直播切片工作台，使用 Python、PySide6 / Qt 
 - 通过 Bilibili 扫码登录，按队列投稿并查询平台处理状态。
 - 两套皮肤、八个工作页面、任务重试、未保存表单保护和运行日志。
 
-## 皮肤角色
+## 极昼与黑夜
 
-- 「羽啾 · 薄荷」：[羽啾chu2u](https://space.bilibili.com/2138961136)
-- 「冰蓝 · 蝶影」：[雨纪_Ameki](https://space.bilibili.com/1932862336)
+- 「极昼」采用中性白色表面、白金太阳娘工作台壁纸和雪原页头。
+- 「黑夜」采用炭黑表面、银发月亮娘工作台壁纸和黑色地貌页头。
 
-**拜托给个关注吧~** 工作台皮肤区域提供对应的个人主页按钮，切换皮肤后链接同步切换。
+左下角调色盘按钮切换整套配色，保留圆形展开动画和系统减少动画设置。工作台人物靠右等比完整显示，横幅补白与图片背景匹配，消除左右色块分界。菜单、输入框、选择、焦点及禁用状态跟随主题；最小窗口为 1020×680。
+
+旧 `mint` 偏好映射为极昼，旧 `rose` 映射为黑夜，读取时不改写原文件。旧角色图片及对应主页按钮不再随当前版本发布；Git 历史保留。
 
 ## 运行要求
 
@@ -76,7 +84,7 @@ $env:LIVECLIP_TEST_FFMPEG = (Resolve-Path .\tools\ffmpeg.exe).Path
 .\.venv\Scripts\python.exe -X utf8 -B quick_ui_test.py
 ```
 
-路径可以替换为自己的隔离测试目录。发布检查扫描 Git 将跟踪的文件并验证许可证及素材清单，不是完整的安全审计或素材授权审查；它不会把未解决的素材权利状态判为已获授权。
+路径可以替换为自己的隔离测试目录。修改后先暂存已审查的文件，再运行 `release_check.py`。发布检查扫描 Git 将跟踪的文件，验证许可证、五张无参考原图及九项图片资源，并拒绝旧角色素材；它不是完整的安全审计或素材授权审查。
 
 ## 构建
 
@@ -88,9 +96,9 @@ $env:LIVECLIP_TEST_FFMPEG = (Resolve-Path .\tools\ffmpeg.exe).Path
 .\build.ps1 -BuildRoot 'E:\CodexBuildCache\StreamClip\release'
 ```
 
-`-BuildRoot` 可指定其他有写入权限的构建目录；不要指向源码或数据目录。脚本先构建、验证包内 QML，再运行打包后的业务和界面自检；全部成功且当前程序未运行时，才备份并替换项目根目录的 `StreamClip.exe`。它不会停止正在录制的进程。请勿直接分发未通过检查的 EXE。
+`-BuildRoot` 可指定其他有写入权限的构建目录；不要指向源码或数据目录。脚本先构建、逐字节验证包内 QML 和图片资源，再运行打包后的业务和界面自检；全部成功且当前程序未运行时，才备份并替换项目根目录的 `StreamClip.exe`。它不会停止正在录制的进程。请勿直接分发未通过检查的 EXE。
 
-源码仓库不包含预编译 EXE。二进制分发还需要核对 Qt、FFmpeg 等随包组件的许可和相应源码要求，并解决上述皮肤素材的授权问题。
+预编译程序作为 GitHub Release 附件分发，不放入 Git 源码历史。下载包包含许可证和第三方声明；Qt、FFmpeg 等随包组件的上游来源见 `THIRD_PARTY_NOTICES.md`。对应版本的完整应用源码可从同一 Release 的源码归档获取。
 
 ## 许可证
 

@@ -1,36 +1,25 @@
 # 素材权利说明
 
-## 角色主页
+## 当前版本
 
-- 第一套「羽啾 · 薄荷」：[羽啾chu2u](https://space.bilibili.com/2138961136)
-- 第二套「冰蓝 · 蝶影」：[雨纪_Ameki](https://space.bilibili.com/1932862336)
+旧版第三方角色素材已移除。当前版本采用「极昼」与「黑夜」主题，工作台分别使用独立设计的太阳娘和月亮娘；不保留旧角色的主页按钮，也不以旧角色或参考图生成新素材。Git 历史未重写，历史提交中的旧素材不属于本次发行内容。
 
-拜托给个关注吧~
+当前随包的图片资源如下：
 
-工作台皮肤区域的同名按钮会打开当前皮肤对应的个人主页，只打开网页，不会自动关注或使用软件保存的 Bilibili 登录凭据。
+| 文件 | 用途及来源 |
+| --- | --- |
+| `app-icon-source.png` | 无角色参考的通用视频工具图标原图。 |
+| `app-icon.png`、`app-icon.ico` | 图标原图的缩放、圆角和多尺寸派生版本。 |
+| `wallpaper-sun.png` | 极昼工作台的日系太阳娘原图。 |
+| `wallpaper-moon.png` | 黑夜工作台的日系月亮娘原图。 |
+| `wallpaper-day.png`、`wallpaper-night.png` | 独立生成的雪地和黑色地貌原图。 |
+| `wallpaper-day-header.png`、`wallpaper-night-header.png` | 对应地貌原图的等比裁切页头。 |
 
-## 尚未取得再分发授权的素材
+五张原图通过已配置的 65535 通道生成，模型标识为 `gpt-image-2.5-flare`；这是通道标识，不标为 OpenAI 官方型号。每张原图的 `references` 均为空，未发送旧角色、用户截图或其他外部参考图片。
 
-本仓库保留「羽啾 · 薄荷」和「冰蓝 · 蝶影」两套皮肤。发布者确认，尚未取得角色形象、用户提供的参考图及其衍生素材的公开再分发授权。它们不因进入本仓库而获得 GPL 或其他开源图片许可。
+生成通道、提示词、任务标识及原图哈希见 `generation-provenance.json`；最终图片的使用位置、派生配方及哈希见 `art-provenance.json`。`tools/build_ui_art.py` 可离线重建派生资源，不调用生图服务。
 
-此状态涉及以下图片，以及相应的角色名称和设计：
-
-- `character.png`
-- `character-sticker.png`
-- `wallpaper-studio.png`
-- `wallpaper-sky.png`
-- `wallpaper-orbits.png`
-- `wallpaper-ice-studio.png`
-- `wallpaper-ice-sky.png`
-- `wallpaper-ice-header.png`
-
-`character-provenance.json` 和 `generation-provenance.json` 记录生成过程、参考图哈希及提示词；`art-provenance.json` 记录派生方式和文件哈希。本机绝对路径在公开版本中已去除，原参考图未包含在仓库中。生成记录、AI 改绘、署名或本说明均不能替代权利人的许可。
-
-**这不是全部素材均已解决授权的发行版。** 不要依据本项目的代码许可证转载、销售或另行授权上述素材。对相关素材的后续发布，应先向权利人确认许可，或自行替换为具有适当授权的图片。
-
-## 通用应用图标
-
-`app-icon-source.png` 是未使用角色参考图的独立 AI 生成图；`app-icon.png` 和 `app-icon.ico` 为本地缩放、圆角及多尺寸派生版本。生成通道、提示词和哈希见来源记录。项目的许可声明不为可能存在的第三方权利作保证。
+来源可追溯和无外部参考生成不代表第三方权利保证。图片与代码的权利范围不同，不能将源码的 GPL 声明解读为对第三方角色、商标、肖像或他人作品的授权；也不承诺生成内容不存在相似性或其他权利争议。
 
 ## Lucide 图标
 

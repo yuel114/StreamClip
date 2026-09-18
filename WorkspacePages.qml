@@ -88,37 +88,16 @@ Item {
             spacing:12
             Item {
                 Layout.fillWidth:true; Layout.preferredHeight:180
-                Rectangle { anchors.fill:parent; radius:18; color:uiTheme.current.sceneFit?uiTheme.current.colors.button:"transparent" }
+                Rectangle { anchors.fill:parent; radius:18; color:uiTheme.current.sceneFit?uiTheme.current.sceneBackground:"transparent" }
                 RoundedImage { id:workbenchArtwork; objectName:"workbenchArtwork"; anchors.fill:parent; source:artRoot+uiTheme.current.scene; radius:18; fillMode:uiTheme.current.sceneFit?Image.PreserveAspectFit:Image.PreserveAspectCrop; horizontalAlignment:uiTheme.current.sceneFit?Image.AlignRight:Image.AlignHCenter }
                 ColumnLayout {
+                    objectName:"workbenchIntro"
                     anchors.left:parent.left; anchors.leftMargin:22; anchors.verticalCenter:parent.verticalCenter; width:parent.width*0.65
                     Label { textFormat: Text.PlainText; text:"把今天的直播，留下精彩片段"; font.pixelSize:22; font.weight:Font.DemiBold; wrapMode:Text.Wrap; Layout.fillWidth:true }
                     Label { textFormat: Text.PlainText; text:bridge.workspace.activeRooms+" 个房间录制中 · "+(bridge.workspace.stats.tasks||0)+" 个任务 · "+(bridge.workspace.stats.clips||0)+" 个切片"; color:uiTheme.current.colors.muted; wrapMode:Text.Wrap; Layout.fillWidth:true }
                     RowLayout {
                         ActionButton { text:"添加直播间"; symbol:"plus"; primary:true; onClicked:pages.addRoom() }
                         ActionButton { text:"导入本地媒体"; symbol:"folder-open"; onClicked:pages.importMedia() }
-                    }
-                }
-                ActionButton {
-                    objectName: "skinProfileLink"
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.margins: 12
-                    text: "拜托给个关注吧~"
-                    symbol: "user-round"
-                    width: Math.ceil(implicitWidth)
-                    height: 32
-                    padding: 6
-                    leftPadding: 10
-                    rightPadding: 10
-                    font.pixelSize: 12
-                    ToolTip.visible: hovered && !uiTheme.transitioning
-                    ToolTip.text: uiTheme.current.profileName + " · Bilibili 个人主页"
-                    Accessible.name: text + " · " + uiTheme.current.profileName
-                    Accessible.description: uiTheme.current.profileUrl
-                    onClicked: {
-                        if (!Qt.openUrlExternally(uiTheme.current.profileUrl))
-                            bridge.error("无法打开个人主页，请检查系统默认浏览器。")
                     }
                 }
             }

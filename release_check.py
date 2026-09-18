@@ -19,6 +19,11 @@ PRIVATE_SUFFIXES = {
     ".exe", ".dll", ".db", ".sqlite", ".sqlite3", ".log", ".pem", ".key",
     ".mp4", ".mkv", ".flv", ".ts", ".mp3", ".wav", ".srt", ".ass", ".zip",
 }
+RETIRED_ART = {
+    "character.png", "character-sticker.png", "character-provenance.json",
+    "wallpaper-studio.png", "wallpaper-sky.png", "wallpaper-orbits.png",
+    "wallpaper-ice-studio.png", "wallpaper-ice-sky.png", "wallpaper-ice-header.png",
+}
 PATTERNS = {
     "private-key": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"),
     "service-token": re.compile(
@@ -44,6 +49,8 @@ def problems(name: str, content: bytes) -> list[str]:
         result.append("private-or-generated-file")
     if len(content) >= 50 * 1024 * 1024:
         result.append("large-git-blob")
+    if path.parent == PurePosixPath("assets/ui") and path.name in RETIRED_ART:
+        result.append("retired-artwork")
     if b"\0" not in content[:8192]:
         result.extend(label for label, pattern in PATTERNS.items() if pattern.search(content))
     return result
@@ -58,6 +65,8 @@ def check_rules() -> None:
         assert problems(name, b"") == ["private-or-generated-file"], name
     for name in ("app.py", ".env.example", "assets/ui/art-provenance.json", "LICENSE"):
         assert not problems(name, b"")
+    for name in RETIRED_ART:
+        assert problems("assets/ui/" + name, b"") == ["retired-artwork"], name
     assert problems("app.py", ("ghp_" + "a" * 30).encode()) == ["service-token"]
     assert problems("notes.md", ("E:" + "/Users/private/file").encode()) == ["personal-home-path"]
     assert problems("notes.md", ("123456789" + "@qq.com").encode()) == ["personal-email"]
@@ -87,18 +96,28 @@ def check_release() -> None:
 
     assert (ROOT / "LICENSE").read_bytes() == (ROOT / "licenses/hikami-go-LICENSE").read_bytes()
     rights = (ROOT / "assets/ui/ASSET_RIGHTS.md").read_text(encoding="utf-8")
-    assert "尚未取得" in rights and "不因进入本仓库而获得 GPL" in rights
+    assert "旧版第三方角色素材已移除" in rights and "不代表第三方权利保证" in rights
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "assets/ui/ASSET_RIGHTS.md" in readme and "GPL" in readme
     generation = json.loads((ROOT / "assets/ui/generation-provenance.json").read_text(encoding="utf-8"))
     manifest = json.loads((ROOT / "assets/ui/art-provenance.json").read_text(encoding="utf-8"))
+    sources = {"app-icon-source.png", "wallpaper-day.png", "wallpaper-night.png",
+               "wallpaper-sun.png", "wallpaper-moon.png"}
+    assets = sources | {"wallpaper-day-header.png", "wallpaper-night-header.png",
+                        "app-icon.png", "app-icon.ico"}
+    assert len(generation["sources"]) == len(sources)
+    assert {entry["file"] for entry in generation["sources"]} == sources
+    assert all(entry["references"] == [] for entry in generation["sources"])
+    assert len(manifest["assets"]) == len(assets)
+    assert {entry["file"] for entry in manifest["assets"]} == assets
+    assert {name for name in names if name.startswith("assets/ui/")
+            and PurePosixPath(name).suffix in {".png", ".ico"}} == {
+                "assets/ui/" + name for name in assets}
     for entry in generation["sources"] + manifest["assets"]:
         file = ROOT / "assets/ui" / entry["file"]
         assert hashlib.sha256(file.read_bytes()).hexdigest() == entry["sha256"], file.name
-    for name in ("wallpaper-studio.png", "wallpaper-ice-studio.png", "character.png"):
-        assert f"assets/ui/{name}" in names and name in rights, name
     print(f"Release checks passed: {len(names)} files; private-file rules, license and artwork hashes.")
-    print("Artwork redistribution permission remains unresolved; this check does not grant permission.")
+    print("Five reference-free originals verified; retired character assets are absent from this snapshot.")
 
 
 if __name__ == "__main__":
