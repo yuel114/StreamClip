@@ -46,13 +46,14 @@ ApplicationWindow {
     palette.disabled.button: uiTheme.current.colors.disabled
     property bool allowClose: false
     property int page: 2
-    property var pageNames: ["录播与总结", "任务", "工作台", "直播间", "切片", "投稿", "账号", "设置"]
+    property var pageNames: ["录播与总结", "任务", "工作台", "直播间", "切片", "投稿", "账号", "设置", "版本"]
     property bool logsOpen: false
     property int selectedTask: 0
     property int confirmationId: 0
     property string confirmationTitle: ""
-    readonly property var navigationOrder: [2, 3, 0, 4, 5, 1, 6, 7]
-    readonly property var pageIcons: ["clapperboard", "list-checks", "house", "radio", "scissors", "send", "user-round", "settings-2"]
+    property string confirmationUpdateVersion: ""
+    readonly property var navigationOrder: [2, 3, 0, 4, 5, 1, 6, 7, 8]
+    readonly property var pageIcons: ["clapperboard", "list-checks", "house", "radio", "scissors", "send", "user-round", "settings-2", "refresh-cw"]
     onActiveChanged: if (active) bridge.refreshMotionPreference()
     onPageChanged: {
         if (skinTransition.busy) skinTransition.finish()
@@ -188,6 +189,15 @@ ApplicationWindow {
                                     rightPadding: 10
                                     Component.onCompleted: contentItem.alignment = Qt.AlignLeft | Qt.AlignVCenter
                                     onClicked: window.page = modelData
+                                    Rectangle {
+                                        objectName: "updateBadge"
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: 9
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 7; height: 7; radius: 3.5
+                                        color: uiTheme.current.colors.primary
+                                        visible: modelData === 8 && bridge.updateInfo.hasUpdate
+                                    }
                                     Accessible.role: Accessible.PageTab
                                     Accessible.checkable: true
                                     Accessible.checked: window.page === modelData
@@ -250,7 +260,7 @@ ApplicationWindow {
             StackLayout {
                 id: pageStack
                 objectName: "pageStack"
-                currentIndex: Math.min(2, window.page)
+                currentIndex: window.page === 8 ? 3 : Math.min(2, window.page)
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 ColumnLayout {
@@ -424,15 +434,21 @@ ApplicationWindow {
                 Item {
                     WorkspacePages {
                         id: workspacePages
-                        page: window.page
+                        page: Math.min(7, window.page)
                         // 隐藏的六页保留表单状态，但不随录播/任务页缩放反复布局。
                         property real retainedWidth: 0
                         property real retainedHeight: 0
-                        width: window.page >= 2 ? parent.width : retainedWidth
-                        height: window.page >= 2 ? parent.height : retainedHeight
-                        onWidthChanged: if (window.page >= 2) retainedWidth = width
-                        onHeightChanged: if (window.page >= 2) retainedHeight = height
+                        width: window.page >= 2 && window.page < 8 ? parent.width : retainedWidth
+                        height: window.page >= 2 && window.page < 8 ? parent.height : retainedHeight
+                        onWidthChanged: if (window.page >= 2 && window.page < 8) retainedWidth = width
+                        onHeightChanged: if (window.page >= 2 && window.page < 8) retainedHeight = height
                         onNavigate: function(target) { window.page = target }
+                    }
+                }
+                VersionPage {
+                    onInstallRequested: function(version) {
+                        window.confirmationUpdateVersion = version
+                        installUpdateDialog.open()
                     }
                 }
             }
@@ -457,6 +473,15 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Label { textFormat: Text.PlainText; text: "处理中…"; visible: bridge.busy; color: uiTheme.current.colors.primary }
                 Label { textFormat: Text.PlainText; text: bridge.status; elide: Text.ElideRight; Layout.fillWidth: true; color: uiTheme.current.colors.muted }
+                Action {
+                    objectName: "updateNoticeButton"
+                    text: "新版本 " + bridge.updateInfo.latestVersion
+                    symbol: "refresh-cw"
+                    visible: bridge.updateInfo.hasUpdate && window.page !== 8
+                    flat: true
+                    implicitHeight: 34
+                    onClicked: window.page = 8
+                }
                 Action { id: logsButton; objectName: "logsButton"; text: window.logsOpen ? "收起日志" : "运行日志"; symbol: "scroll-text"; flat: true; implicitHeight: 34; onClicked: window.logsOpen = !window.logsOpen }
             }
         }
@@ -509,6 +534,33 @@ ApplicationWindow {
         standardButtons: Dialog.Ok
         onOpened: standardButton(Dialog.Ok).text = "确定"
         Label { textFormat: Text.PlainText; id: errorMessage; width: parent.width; wrapMode: Text.Wrap }
+    }
+    AppDialog {
+        id: installUpdateDialog
+        objectName: "installUpdateDialog"
+        title: "安装更新并重启"
+        anchors.centerIn: parent
+        width: 520
+        modal: true
+        standardButtons: Dialog.Yes | Dialog.No
+        onOpened: {
+            standardButton(Dialog.Yes).text = "安装并重启"
+            standardButton(Dialog.No).text = "取消"
+            standardButton(Dialog.No).forceActiveFocus()
+        }
+        onAccepted: {
+            workspacePages.pauseVideo()
+            bridge.installUpdate(window.confirmationUpdateVersion)
+        }
+        Label {
+            objectName: "installUpdateMessage"
+            width: parent.width
+            text: "安装 v" + window.confirmationUpdateVersion + " 后将关闭并重新打开 StreamClip。\n\n只替换程序，保留旧版备份；账号、设置、录播及媒体工具不会被覆盖。更新前请备份数据，不要用旧版程序打开已升级的数据。\n\n" +
+                  (workspacePages.hasUnsaved() ? "仍有未保存的表单修改，重启后将丢失。\n\n" : "") +
+                  "有录制或处理任务时暂不安装。"
+            wrapMode: Text.Wrap
+            textFormat: Text.PlainText
+        }
     }
     AppDialog {
         id: closeDialog

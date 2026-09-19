@@ -6,6 +6,8 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 
+from app_updates import LOCAL_HISTORY, VERSION, version_key
+
 
 ROOT = Path(__file__).resolve().parent
 PRIVATE_PARTS = {
@@ -112,6 +114,12 @@ def check_release() -> None:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "assets/ui/ASSET_RIGHTS.md" in readme and "GPL" in readme
     assert all(section in readme for section in ("## 功能", "## 下载", "## 运行要求", "## 源码启动"))
+    assert "## 版本与更新" in readme and f"v{VERSION}" in readme
+    assert version_key(LOCAL_HISTORY[0]["version"]) == version_key(VERSION)
+    assert {"VersionPage.qml", "app_updates.py", "install-update.ps1", "update_test.py",
+            "assets/ui/icons/download.svg"} <= set(names), "Update resources missing from the public snapshot."
+    build = (ROOT / "build.ps1").read_text(encoding="utf-8")
+    assert "'VersionPage.qml'" in build and "'install-update.ps1'" in build
     assert not any(term in readme for term in (
         "皮肤", "主题", "极昼", "黑夜", "太阳娘", "月亮娘",
         "旧版第三方角色", "生成记录不代表",

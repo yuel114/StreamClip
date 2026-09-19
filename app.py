@@ -8319,6 +8319,7 @@ class RecorderService:
         self._publish_slot_lock = threading.Lock()
         self._publish_next_slot = 0.0
         self._last_receipt_poll = 0.0
+        self._update_pending = False
 
     def _cookie_for(self, role: str, account_id: int = 0) -> str:
         account_id = int(account_id or getattr(self.settings, "download_account_id" if role == "download" else "publish_account_id", 0) or 0)
@@ -8354,7 +8355,7 @@ class RecorderService:
 
     def _schedule_task(self, task_id: int, runner: Callable[[], Any]) -> None:
         with self._scheduled_lock:
-            if task_id in self._scheduled_tasks:
+            if self._update_pending or task_id in self._scheduled_tasks:
                 return
             self._scheduled_tasks.add(task_id)
 
@@ -8932,7 +8933,7 @@ class RecorderService:
 
     def start_recording(self, room_id: str) -> None:
         with self._active_lock:
-            if room_id in self._active:
+            if self._update_pending or room_id in self._active:
                 return
             self._recovery.pop(room_id, None)
             state: dict[str, Any] = {"stop": threading.Event(), "process": None, "recording_id": None, "danmaku_collector": None, "manual_stop": False}
@@ -9220,7 +9221,7 @@ class RecorderService:
             raise ValueError("请选择主播后再发现或复核术语。")
         key = (channel_id, mode, recording_id if mode == "discover" else None)
         with self._glossary_jobs_lock:
-            if key in self._glossary_jobs:
+            if self._update_pending or key in self._glossary_jobs:
                 return False
             self._glossary_jobs.add(key)
 
@@ -12570,6 +12571,8 @@ class DesktopApp:
 
 
 def run_self_test() -> None:
+    from update_test import run as check_updates
+    check_updates()
     from security_test import run as check_credential_protection
     check_credential_protection()
     from danmaku_test import run as check_danmaku_connection

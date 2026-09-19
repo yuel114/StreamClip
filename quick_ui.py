@@ -7,6 +7,7 @@ import logging
 import os
 import queue
 import sys
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 from pathlib import Path
@@ -20,6 +21,7 @@ from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
 from PySide6.QtQuickControls2 import QQuickStyle
 
 import app as core
+import app_updates
 from quick_forms import ROOM_FIELDS, SETTINGS_FIELDS, UPLOAD_FIELDS, settings_values, validated_settings
 from character_theme import motion_enabled
 from quick_theme import UiTheme
@@ -209,6 +211,7 @@ class Bridge(QObject):
     asrModelsReady = Signal("QVariantMap")
     error = Signal(str)
     completed = Signal(str)
+    updateChanged = Signal()
     closed = Signal()
     _result = Signal(str, object)
 
@@ -249,6 +252,43 @@ class Bridge(QObject):
         self._detail_cache = None
         self._pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="quick-data")
         self._result.connect(self._receive, Qt.QueuedConnection)
+        self._update_cancel = threading.Event()
+        self._staged_update = None
+        self._update_installer = None
+        self._latest_release = None
+        self._update_preferences = self.db.path.parent / "updates.json"
+        preference_error = ""
+        automatic = True
+        if self._update_preferences.exists():
+            try:
+                saved = json.loads(self._update_preferences.read_text(encoding="utf-8"))
+                if not isinstance(saved, dict) or type(saved.get("autoCheck")) is not bool:
+                    raise ValueError("无效更新偏好")
+                automatic = saved["autoCheck"]
+            except (OSError, ValueError):
+                automatic = False
+                preference_error = "更新偏好读取失败，已暂停自动检查；可手动检查或重新设置。"
+        self._update = {
+            "currentVersion": app_updates.VERSION, "state": "idle", "message": "尚未检查新版本",
+            "error": preference_error, "lastChecked": "", "autoCheck": automatic,
+            "hasUpdate": False, "latestVersion": "", "canDownload": False,
+            "sourceBuild": not getattr(sys, "frozen", False), "progress": 0, "received": 0, "total": 0,
+            "history": app_updates.release_history(), "releaseUrl": app_updates.RELEASES_URL,
+        }
+        result_path = core.runtime_root() / "data/updates/last-result.json"
+        if getattr(sys, "frozen", False) and result_path.is_file():
+            try:
+                result = json.loads(result_path.read_text(encoding="utf-8-sig"))
+                if result.get("success") is False:
+                    self._update["error"] = "上次更新未完成，原程序已保留。详情：" + str(result.get("error") or "")
+            except (ValueError, OSError, AttributeError):
+                self._update["error"] = "上次更新结果无法读取，请检查 data/updates/last-result.json。"
+        self.update_timer = QTimer(self)
+        self.update_timer.setInterval(4 * 60 * 60 * 1000)
+        self.update_timer.timeout.connect(self._automatic_update_check)
+        self.update_startup = QTimer(self)
+        self.update_startup.setSingleShot(True)
+        self.update_startup.timeout.connect(self._automatic_update_check)
         self.timer = QTimer(self)
         self.timer.setInterval(800)
         self.timer.timeout.connect(self.refresh)
@@ -337,7 +377,8 @@ class Bridge(QObject):
             try:
                 result = work()
             except Exception as exc:
-                logging.exception("Qt Quick %s failed", kind)
+                if not isinstance(exc, app_updates.DownloadCancelled):
+                    logging.exception("Qt Quick %s failed", kind)
                 result = exc
             if not self._closing or kind == "close":
                 self._result.emit(kind, result)
@@ -346,7 +387,111 @@ class Bridge(QObject):
     def start(self):
         self._submit("start", self._start_service)
         self.timer.start()
+        self.update_timer.start()
+        self.update_startup.start(10000)
         self.refresh()
+
+    @Property("QVariantMap", notify=updateChanged)
+    def updateInfo(self):
+        return self._update
+
+    def _automatic_update_check(self):
+        if self._update["autoCheck"]:
+            self.checkUpdates()
+
+    @Slot()
+    def checkUpdates(self):
+        if self._closing or self._update["state"] in {"checking", "downloading", "installing"}:
+            return
+        self._update.update(state="checking", message="正在检查 GitHub 正式版本…", error="")
+        self.updateChanged.emit()
+        self._submit("updateCheck", app_updates.fetch_releases, network=True)
+
+    @Slot(bool)
+    def setAutomaticUpdates(self, enabled):
+        if self._closing:
+            return
+        self._submit("updatePreference", lambda: (core.write_json_atomic(self._update_preferences, {"autoCheck": enabled}), enabled)[1])
+
+    @Slot()
+    def downloadUpdate(self):
+        if self._closing or self._update["state"] in {"checking", "downloading", "installing", "ready"}:
+            return
+        if not self._latest_release or not self._update["canDownload"]:
+            return
+        self._update_cancel.clear()
+        release = dict(self._latest_release)
+        self._update.update(state="downloading", message="正在下载并校验更新包…", error="", progress=0, received=0, total=release["package"]["size"])
+        self.updateChanged.emit()
+        self._submit("updateDownload", lambda: app_updates.download_release(
+            release, core.runtime_root(), self._update_cancel,
+            lambda received, total: self._result.emit("updateProgress", (received, total))), network=True)
+
+    @Slot()
+    def cancelUpdateDownload(self):
+        self._update_cancel.set()
+
+    @Slot(str)
+    def installUpdate(self, version):
+        if self.busy or self._update["state"] != "ready" or not self._staged_update:
+            return
+        if version != self._staged_update["version"]:
+            return
+        self._busy = True
+        self._update.update(state="installing", message="正在准备安装…", error="")
+        self.changed.emit()
+        self.updateChanged.emit()
+
+        def prepare():
+            # Freeze new work under the same locks as recording/task admission.
+            with self.service._active_lock, self.service._scheduled_lock, self.service._glossary_jobs_lock:
+                if self.service.active_room_ids() or self.service._scheduled_tasks or self.service._glossary_jobs or self.db.list_tasks(statuses=["running", "queued", "retry"]):
+                    raise ValueError("仍有录制、处理或排队任务，请在任务结束后安装更新。")
+                process = app_updates.launch_installer(self._staged_update)
+                self.service._update_pending = True
+                return process
+        self._submit("updateInstall", prepare)
+
+    def _receive_update(self, kind, result):
+        if isinstance(result, app_updates.UpdateFileError):
+            self._staged_update = None
+        if kind == "updateInstall":
+            self._busy = False
+            self.changed.emit()
+        if kind == "updatePreference" and isinstance(result, Exception):
+            self._update["error"] = "更新偏好保存失败：" + str(result)
+        elif isinstance(result, app_updates.DownloadCancelled):
+            self._update.update(state="available", message="下载已取消，可重新下载。", error="", progress=0)
+        elif isinstance(result, Exception):
+            self._update.update(state="ready" if self._staged_update else "error", error=str(result), message="更新未完成，可重试或打开发布页面。")
+        elif kind == "updatePreference":
+            self._update.update(autoCheck=result, error="")
+        elif kind == "updateCheck":
+            latest = result[0] if result else None
+            newer = bool(latest and app_updates.version_key(latest["version"]) > app_updates.version_key(app_updates.VERSION))
+            self._latest_release = latest
+            ready = bool(newer and self._staged_update and self._staged_update["version"] == latest["version"])
+            if not ready:
+                self._staged_update = None
+            state = "ready" if ready else "available" if newer else "current" if latest and app_updates.version_key(latest["version"]) == app_updates.version_key(app_updates.VERSION) else "ahead" if latest else "idle"
+            message = {"ready": "更新已下载并通过校验，可以安装。", "available": "发现新版本 " + (latest["version"] if latest else ""),
+                       "current": "当前已是最新正式版。", "ahead": "当前为较新的本地版本，尚无可升级的正式版。", "idle": "暂未发现正式发布的版本。"}[state]
+            self._update.update(state=state, message=message, error="", lastChecked=datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                hasUpdate=newer, latestVersion=latest["version"] if latest else "",
+                                canDownload=bool(newer and latest.get("package") and not self._update["sourceBuild"]),
+                                history=app_updates.release_history(result))
+        elif kind == "updateProgress":
+            if self._update["state"] != "downloading":
+                return
+            received, total = result
+            self._update.update(progress=received / total, received=received, total=total)
+        elif kind == "updateDownload":
+            self._staged_update = result
+            self._update.update(state="ready", message="更新已下载并通过校验，可以安装。", error="", progress=1)
+        elif kind == "updateInstall":
+            self._update_installer = result
+            self.close()
+        self.updateChanged.emit()
 
     def _start_service(self):
         if self.settings.bili_cookie.strip():
@@ -792,8 +937,15 @@ class Bridge(QObject):
             self._busy = False
         if kind == "close":
             if isinstance(result, Exception):
+                self.service._update_pending = False
+                if self._update_installer is not None and self._update_installer.poll() is None:
+                    self._update_installer.terminate()
+                    self._update_installer = None
+                    self._update.update(state="ready", error="退出失败，更新已停止；可以重试。")
+                    self.updateChanged.emit()
                 self._closing = False
                 self.timer.start()
+                self.update_timer.start()
                 self.error.emit(str(result))
                 self.changed.emit()
                 return
@@ -802,6 +954,9 @@ class Bridge(QObject):
             self.closed.emit()
             return
         if self._closing:
+            return
+        if kind.startswith("update"):
+            self._receive_update(kind, result)
             return
         if kind == "qr":
             if result and result.get("request_id") == self._qr_id and self._qr_cancel and not self._qr_cancel.is_set():
@@ -885,6 +1040,9 @@ class Bridge(QObject):
         if self._closing:
             return
         self._closing = True
+        self.update_timer.stop()
+        self.update_startup.stop()
+        self._update_cancel.set()
         self.cancelQr()
         self._status = "正在停止后台服务…"
         self.timer.stop()
@@ -895,6 +1053,7 @@ class Bridge(QObject):
 def create_engine(bridge):
     QGuiApplication.setApplicationName(core.APP_NAME)
     QGuiApplication.setApplicationDisplayName(core.APP_NAME)
+    QGuiApplication.setApplicationVersion(app_updates.VERSION)
     if sys.platform == "win32":
         # 本机 D3D11 flip 交换链会在快扩窗时补黑；OpenGL 可使用原生类背景刷补边。
         # basic 避免 OpenGL 调整尺寸时 GUI/渲染线程互等，后台 I/O 仍在工作线程。
@@ -969,6 +1128,9 @@ def run():
         application.exec()
     finally:
         bridge.timer.stop()
+        bridge.update_timer.stop()
+        bridge.update_startup.stop()
+        bridge._update_cancel.set()
         if not bridge._closing:
             bridge.service.stop()
             bridge._pool.shutdown(wait=True)

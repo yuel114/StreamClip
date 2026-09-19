@@ -50,6 +50,8 @@ $env:PATH = "$taskPythonRoot;$taskPythonRoot\Scripts;$env:SystemRoot\System32;$e
   --add-data ((Join-Path $appRoot 'SegmentedBar.qml') + ';.') `
   --add-data ((Join-Path $appRoot 'ToggleSwitch.qml') + ';.') `
   --add-data ((Join-Path $appRoot 'SkinTransition.qml') + ';.') `
+  --add-data ((Join-Path $appRoot 'VersionPage.qml') + ';.') `
+  --add-data ((Join-Path $appRoot 'install-update.ps1') + ';.') `
   --add-data ((Join-Path $appRoot 'THIRD_PARTY_NOTICES.md') + ';.') `
   --add-data ((Join-Path $appRoot 'LICENSE') + ';.') `
   --add-data ((Join-Path $appRoot 'licenses\hikami-go-LICENSE') + ';licenses') `
@@ -72,6 +74,8 @@ $built = Join-Path $distRoot $outputName
 # Verify every shipped visual resource, including absence of retired artwork.
 & $taskPython -c "import sys; from pathlib import Path; from PyInstaller.archive.readers import CArchiveReader; archive = CArchiveReader(sys.argv[1]); root = Path(sys.argv[2]); sources = [*root.glob('*.qml'), *(p for p in (root / 'assets/ui').rglob('*') if p.is_file())]; expected = {str(p.relative_to(root)).replace('/', '\\') for p in sources}; actual = {n.replace('/', '\\') for n in archive.toc if n.replace('\\', '/').startswith('assets/ui/') or n.endswith('.qml') and '/' not in n.replace('\\', '/')}; assert expected == actual, (expected - actual, actual - expected); [None if archive.extract(str(p.relative_to(root))) == p.read_bytes() else sys.exit('Packaged resource differs: ' + p.name) for p in sources]; print('Packaged QML and artwork match source')" $built $appRoot
 if ($LASTEXITCODE -ne 0) { throw 'Executable QML verification failed.' }
+& $taskPython -c "import sys; from pathlib import Path; from PyInstaller.archive.readers import CArchiveReader; assert CArchiveReader(sys.argv[1]).extract('install-update.ps1') == Path(sys.argv[2]).read_bytes(); print('Packaged update helper matches source')" $built (Join-Path $appRoot 'install-update.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Executable update helper verification failed.' }
 $check = Start-Process -FilePath $built -ArgumentList '--self-test' -WindowStyle Hidden -PassThru
 if (-not $check.WaitForExit(120000)) { $check.Kill($true); throw 'Executable self-test timed out.' }
 if ($check.ExitCode -ne 0) { throw "Executable self-test failed: $($check.ExitCode)" }

@@ -1034,7 +1034,7 @@ def check_apple_ui(application, bridge, window, output):
     from PySide6.QtSvg import QSvgRenderer
 
     icons = Path(ui.__file__).parent / "assets/ui/icons"
-    assert len(list(icons.glob("*.svg"))) == 24
+    assert len(list(icons.glob("*.svg"))) == 25
     assert all(QSvgRenderer(str(path)).isValid() for path in icons.glob("*.svg")), "图标缺失或不是有效 SVG"
     pages = window.findChild(QObject, "workspacePages")
     form = window.findChild(QObject, "settingsForm")
@@ -1130,7 +1130,7 @@ def check_apple_ui(application, bridge, window, output):
         bridge.refreshMotionPreference()
         assert not bridge.motionEnabled
         assert page_stack.property("opacity") == 1 and log_panel.property("extent") == 120, (page_stack.property("opacity"), log_panel.property("extent"))
-        for page in range(8):
+        for page in range(9):
             window.setProperty("page", page)
             application.processEvents()
             expected = qml_call(selection, "entry.y + (entry.index === 5 ? 28 : 0)")[0]
@@ -1400,7 +1400,7 @@ def check_skin_switch(application, bridge, engine, window, output):
                 point = button.mapToScene(QPointF(0, 0))
                 assert point.y() >= 0 and point.y() + 48 <= height - 16
                 assert button.property("width") == button.property("height") == 48
-                for target in range(8):
+                for target in range(9):
                     window.setProperty("page", target)
                     QTest.qWait(190)
                     if target == 2:
@@ -1444,8 +1444,164 @@ def check_skin_switch(application, bridge, engine, window, output):
         window.setProperty("page", page)
 
 
+def check_updates_ui(application, bridge, engine, window, output):
+    from update_test import release
+    import threading
+
+    initial = dict(bridge.updateInfo)
+    page = window.property("page")
+    form = window.findChild(QObject, "settingsForm")
+    original_form = qml_call(form, "JSON.stringify(values)")[0]
+    dirty = form.property("dirty")
+    version_page = window.findChild(QObject, "versionPage")
+    button = window.findChild(QObject, "checkUpdatesButton")
+    download = window.findChild(QObject, "downloadUpdateButton")
+    dialog = window.findChild(QObject, "installUpdateDialog")
+    try:
+        nav = qml_call(window, "navigationItems.itemAt(8).children.find(item => item.objectName === 'navigation_8')")[0]
+        assert nav is not None and nav.property("text") == "版本"
+        qml_call(nav, "clicked()")
+        assert window.property("page") == 8 and version_page.property("visible")
+        assert bridge.updateInfo["state"] == "idle" and len(bridge.updateInfo["history"]) >= 4
+        qml_call(form, 'setValue("llm_endpoint", "https://offline.invalid/unsaved")')
+        new_release = ui.app_updates.parse_releases([release()])
+        gate = threading.Event()
+        def fetch():
+            assert gate.wait(5)
+            return new_release
+        with patch.object(ui.app_updates, "fetch_releases", side_effect=fetch) as fetcher:
+            qml_call(button, "clicked()")
+            assert bridge.updateInfo["state"] == "checking" and not button.property("enabled")
+            bridge.checkUpdates()
+            gate.set()
+            wait_for(application, lambda: bridge.updateInfo["state"] == "available")
+            assert fetcher.call_count == 1
+        assert bridge.updateInfo["hasUpdate"] and bridge.updateInfo["latestVersion"] == "2099.01.01"
+        assert bridge.updateInfo["canDownload"] is not initial["sourceBuild"]
+        assert qml_call(form, "values.llm_endpoint")[0] == "https://offline.invalid/unsaved"
+        assert form.property("dirty")
+        window.setProperty("page", 2)
+        notice = window.findChild(QObject, "updateNoticeButton")
+        assert notice.property("visible")
+        qml_call(notice, "clicked()")
+        assert window.property("page") == 8
+        bridge.setAutomaticUpdates(False)
+        wait_for(application, lambda: not bridge.updateInfo["autoCheck"])
+        assert json.loads(bridge._update_preferences.read_text(encoding="utf-8")) == {"autoCheck": False}
+        with patch.object(ui.app_updates, "fetch_releases") as fetcher:
+            bridge._automatic_update_check()
+            QTest.qWait(30)
+            fetcher.assert_not_called()
+        bridge.setAutomaticUpdates(True)
+        wait_for(application, lambda: bridge.updateInfo["autoCheck"])
+        with patch.object(ui.core, "write_json_atomic", side_effect=OSError("offline disk failure")):
+            bridge.setAutomaticUpdates(False)
+            wait_for(application, lambda: "保存失败" in bridge.updateInfo["error"])
+            assert bridge.updateInfo["autoCheck"] and bridge.updateInfo["state"] == "available"
+        with patch.object(ui.app_updates, "fetch_releases", side_effect=ValueError("离线测试：无法连接 GitHub")):
+            qml_call(button, "clicked()")
+            wait_for(application, lambda: bridge.updateInfo["state"] == "error")
+            assert len(bridge.updateInfo["history"]) >= 4 and "无法连接" in bridge.updateInfo["error"]
+            QTest.qWait(50)
+            assert window.grabWindow().save(str(output / "version-error.png"))
+        bridge._update["sourceBuild"] = False
+        with patch.object(ui.app_updates, "fetch_releases", return_value=new_release):
+            bridge.checkUpdates()
+            wait_for(application, lambda: bridge.updateInfo["state"] == "available")
+        assert download.property("visible") and download.property("enabled")
+        for skin in ("day", "night"):
+            engine.ui_theme.select(skin)
+            for width, height in ((1280, 820), (1020, 680)):
+                window.resize(width, height)
+                QTest.qWait(200)
+                for control in (nav, button, download, window.findChild(QObject, "automaticUpdatesSwitch")):
+                    position = qml_call(control, "mapToItem(null, 0, 0)")[0]
+                    assert control.property("visible") and position.x() >= 0 and position.y() >= 0
+                    assert position.x() + control.property("width") <= width
+                    assert position.y() + control.property("height") <= height
+                    assert not qml_call(control, "contentItem.truncated || false")[0]
+                assert window.grabWindow().save(str(output / f"version-{skin}-{width}.png"))
+        history = window.findChild(QObject, "releaseHistory")
+        assert qml_call(history, "count")[0] == 5
+        qml_call(history, "itemAtIndex(0).expanded = true")
+        QTest.qWait(50)
+        assert qml_call(history, "itemAtIndex(0).height")[0] > 60
+        qml_call(history, "itemAtIndex(0).expanded = false")
+        release_gate = threading.Event()
+        def downloading(release_data, root, cancel, progress):
+            progress(128, 512)
+            assert release_gate.wait(5)
+            if cancel.is_set():
+                raise ui.app_updates.DownloadCancelled()
+            return {"version": release_data["version"], "path": "offline-stage", "sha256": "a" * 64}
+        with patch.object(ui.app_updates, "download_release", side_effect=downloading):
+            qml_call(download, "clicked()")
+            wait_for(application, lambda: bridge.updateInfo["progress"] == 0.25)
+            assert not button.property("enabled") and not download.property("enabled")
+            qml_call(window.findChild(QObject, "cancelUpdateButton"), "clicked()")
+            release_gate.set()
+            wait_for(application, lambda: bridge.updateInfo["state"] == "available")
+            assert "取消" in bridge.updateInfo["message"]
+            qml_call(download, "clicked()")
+            wait_for(application, lambda: bridge.updateInfo["state"] == "ready")
+        assert download.property("text") == "安装并重启"
+        qml_call(download, "clicked()")
+        wait_for(application, lambda: dialog.property("opened"))
+        assert qml_call(dialog, "standardButton(Dialog.No).activeFocus")[0]
+        assert "未保存的表单" in window.findChild(QObject, "installUpdateMessage").property("text"), "安装确认遗漏未保存表单"
+        QTest.qWait(50)
+        assert window.grabWindow().save(str(output / "version-confirmation.png"))
+        with patch.object(ui.app_updates, "launch_installer") as launch:
+            qml_call(dialog, "reject()")
+            launch.assert_not_called()
+        for kind in ("recording", "scheduled", "glossary", "queued"):
+            with patch.object(bridge.service, "active_room_ids", return_value={"123"} if kind == "recording" else set()), \
+                 patch.object(bridge.service, "_scheduled_tasks", {1} if kind == "scheduled" else set()), \
+                 patch.object(bridge.service, "_glossary_jobs", {("test", "job", 1)} if kind == "glossary" else set()), \
+                 patch.object(bridge.db, "list_tasks", return_value=[{"id": 1}] if kind == "queued" else []), \
+                 patch.object(ui.app_updates, "launch_installer") as launch:
+                bridge.installUpdate("2099.01.01")
+                wait_for(application, lambda: not bridge.busy)
+                assert bridge.updateInfo["state"] == "ready" and "任务" in bridge.updateInfo["error"]
+                launch.assert_not_called()
+        with patch.object(bridge.service, "active_room_ids", return_value=set()), \
+             patch.object(bridge.db, "list_tasks", return_value=[]), \
+             patch.object(ui.app_updates, "launch_installer") as launch, patch.object(bridge, "close") as close:
+            bridge.installUpdate("2098.01.01")
+            launch.assert_not_called()
+            bridge.installUpdate("2099.01.01")
+            wait_for(application, lambda: not bridge.busy)
+            launch.assert_called_once()
+            close.assert_called_once()
+            assert bridge.service._update_pending
+            with patch.object(bridge.service.executor, "submit") as submit:
+                bridge.service.start_recording("update-guard")
+                bridge.service._schedule_task(999999, lambda: None)
+                submit.assert_not_called()
+        bridge.service._update_pending = False
+        bridge._receive_update("updateInstall", ui.app_updates.UpdateFileError("离线测试：文件被改动，请重新下载"))
+        assert bridge._staged_update is None and bridge.updateInfo["state"] == "error"
+        assert download.property("text") == "下载更新" and download.property("enabled")
+        for version, state in ((ui.app_updates.VERSION, "current"), ("2026.09.18", "ahead")):
+            bridge._update["state"] = "idle"
+            with patch.object(ui.app_updates, "fetch_releases", return_value=ui.app_updates.parse_releases([release(version)])):
+                bridge.checkUpdates()
+                wait_for(application, lambda: bridge.updateInfo["state"] == state)
+                assert not bridge.updateInfo["hasUpdate"] and not download.property("visible")
+        print("Version UI checks passed: nine-page navigation, drafts, automatic checks, errors, cancellation, task guards, confirmation and both skins/sizes")
+    finally:
+        bridge._update = initial
+        bridge.service._update_pending = False
+        bridge._staged_update = bridge._update_installer = bridge._latest_release = None
+        bridge.updateChanged.emit()
+        engine.ui_theme.select("day")
+        qml_call(form, "reset(" + original_form + ")")
+        form.setProperty("dirty", dirty)
+        window.setProperty("page", page)
+
+
 @patch.object(ui, "motion_enabled", return_value=False)
-def run(motion_preference):
+def run(motion_preference, updates_only=False):
     check_media_identity()
     output = Path(ui.os.environ.get("LIVECLIP_UI_TEST_OUTPUT", str(Path(tempfile.gettempdir()) / "StreamClip" / "ui-check")))
     output.mkdir(parents=True, exist_ok=True)
@@ -1453,9 +1609,10 @@ def run(motion_preference):
     application = QGuiApplication([])
     warnings = []
     qInstallMessageHandler(lambda mode, context, message: warnings.append(message))
-    check_skin_preferences(output)
-    check_finished_recordings(application, output)
-    check_lightweight_clip_rows(application, output)
+    if not updates_only:
+        check_skin_preferences(output)
+        check_finished_recordings(application, output)
+        check_lightweight_clip_rows(application, output)
     with tempfile.TemporaryDirectory(dir=output) as folder:
         settings = ui.core.Settings(base_dir=folder)
         settings.ensure_dirs()
@@ -1466,6 +1623,14 @@ def run(motion_preference):
         bridge.error.connect(errors.append)
         engine = None
         try:
+            if updates_only:
+                engine = ui.create_engine(bridge)
+                window = engine.rootObjects()[0]
+                wait_for(application, window.isExposed)
+                check_updates_ui(application, bridge, engine, window, output)
+                assert not [w for w in warnings if any(s in w for s in ("ReferenceError", "TypeError", "Unable to assign", "Binding loop", "recursive rearrange"))], warnings
+                print("Version-only Qt Quick offline checks passed")
+                return
             model = ui.Rows()
             resets, changes = [], []
             model.modelReset.connect(lambda: resets.append(True))
@@ -1618,7 +1783,7 @@ def run(motion_preference):
                 assert studio_name.property("visible") and not studio_name.property("truncated"), "侧栏名称显示不完整"
                 assert qml_call(studio_name, "x >= 0 && x + width <= parent.width")[0], "侧栏名称超出可用宽度"
                 assert qml_call(studio_icon, "visible && width === 56 && height === 56 && x >= 0 && x + width <= parent.width")[0], "侧栏应用图标不可见或尺寸越界"
-                for page in range(8):
+                for page in range(9):
                     window.setProperty("page", page)
                     QTest.qWait(150)
                     if page == 0:
@@ -1643,6 +1808,7 @@ def run(motion_preference):
             check_theme_controls(application, bridge, engine, window, output)
             (output / "night-edges").mkdir(exist_ok=True)
             check_skin_switch(application, bridge, engine, window, output)
+            check_updates_ui(application, bridge, engine, window, output)
             assert_native_resize_edges(window, output)
 
             # 连续改变真实窗口尺寸，同时让数据库读取每次阻塞 150ms。
@@ -1719,4 +1885,4 @@ def run(motion_preference):
 
 
 if __name__ == "__main__":
-    run()
+    run(updates_only="--updates-only" in ui.sys.argv)
