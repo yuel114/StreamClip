@@ -1502,6 +1502,7 @@ def check_updates_ui(application, bridge, engine, window, output):
             qml_call(button, "clicked()")
             wait_for(application, lambda: bridge.updateInfo["state"] == "error")
             assert len(bridge.updateInfo["history"]) >= 4 and "无法连接" in bridge.updateInfo["error"]
+            assert bridge.updateInfo["message"].startswith("版本检查未完成")
             QTest.qWait(50)
             assert window.grabWindow().save(str(output / "version-error.png"))
         bridge._update["sourceBuild"] = False
@@ -1522,7 +1523,7 @@ def check_updates_ui(application, bridge, engine, window, output):
                     assert not qml_call(control, "contentItem.truncated || false")[0]
                 assert window.grabWindow().save(str(output / f"version-{skin}-{width}.png"))
         history = window.findChild(QObject, "releaseHistory")
-        assert qml_call(history, "count")[0] == 5
+        assert qml_call(history, "count")[0] == len(ui.app_updates.LOCAL_HISTORY) + 1
         qml_call(history, "itemAtIndex(0).expanded = true")
         QTest.qWait(50)
         assert qml_call(history, "itemAtIndex(0).height")[0] > 60
@@ -1588,6 +1589,20 @@ def check_updates_ui(application, bridge, engine, window, output):
                 bridge.checkUpdates()
                 wait_for(application, lambda: bridge.updateInfo["state"] == state)
                 assert not bridge.updateInfo["hasUpdate"] and not download.property("visible")
+        for version, state in ((ui.app_updates.VERSION, "current"), ("2099.01.01", "available"), ("2026.09.18", "ahead")):
+            public_release = ui.app_updates.parse_releases([release(version)])
+            public_release[0]["source"] = "release-page"
+            with patch.object(ui.app_updates, "fetch_releases", return_value=public_release):
+                qml_call(button, "clicked()")
+                wait_for(application, lambda: bridge.updateInfo["state"] == state)
+            assert not bridge.updateInfo["error"] and "发布页面确认" in bridge.updateInfo["message"]
+            assert "历史版本列表暂未同步" in bridge.updateInfo["message"]
+            assert bridge.updateInfo["canDownload"] is (state == "available")
+            public_release[0]["package"] = {}
+            with patch.object(ui.app_updates, "fetch_releases", return_value=public_release):
+                bridge.checkUpdates()
+                wait_for(application, lambda: bridge.updateInfo["state"] == state)
+            assert not download.property("visible")
         print("Version UI checks passed: nine-page navigation, drafts, automatic checks, errors, cancellation, task guards, confirmation and both skins/sizes")
     finally:
         bridge._update = initial

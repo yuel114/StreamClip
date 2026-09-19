@@ -463,7 +463,8 @@ class Bridge(QObject):
         elif isinstance(result, app_updates.DownloadCancelled):
             self._update.update(state="available", message="下载已取消，可重新下载。", error="", progress=0)
         elif isinstance(result, Exception):
-            self._update.update(state="ready" if self._staged_update else "error", error=str(result), message="更新未完成，可重试或打开发布页面。")
+            message = "版本检查未完成，可重试或打开发布页面。" if kind == "updateCheck" else "更新未完成，可重试或打开发布页面。"
+            self._update.update(state="ready" if self._staged_update else "error", error=str(result), message=message)
         elif kind == "updatePreference":
             self._update.update(autoCheck=result, error="")
         elif kind == "updateCheck":
@@ -476,6 +477,8 @@ class Bridge(QObject):
             state = "ready" if ready else "available" if newer else "current" if latest and app_updates.version_key(latest["version"]) == app_updates.version_key(app_updates.VERSION) else "ahead" if latest else "idle"
             message = {"ready": "更新已下载并通过校验，可以安装。", "available": "发现新版本 " + (latest["version"] if latest else ""),
                        "current": "当前已是最新正式版。", "ahead": "当前为较新的本地版本，尚无可升级的正式版。", "idle": "暂未发现正式发布的版本。"}[state]
+            if latest and latest.get("source") == "release-page":
+                message += " 已通过发布页面确认；历史版本列表暂未同步。"
             self._update.update(state=state, message=message, error="", lastChecked=datetime.now().strftime("%Y-%m-%d %H:%M"),
                                 hasUpdate=newer, latestVersion=latest["version"] if latest else "",
                                 canDownload=bool(newer and latest.get("package") and not self._update["sourceBuild"]),

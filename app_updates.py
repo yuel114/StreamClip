@@ -1,6 +1,8 @@
 """Public release discovery and verified Windows EXE staging; no account credentials."""
 
 import hashlib
+from html.parser import HTMLParser
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -14,16 +16,18 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
 import zipfile
 
 
-VERSION = "2026.09.19.2"
+VERSION = "2026.09.19.3"
 REPOSITORY = "yuyu121704/StreamClip"
 RELEASES_URL = f"https://github.com/{REPOSITORY}/releases"
 API_URL = f"https://api.github.com/repos/{REPOSITORY}/releases?per_page=100"
 MAX_PACKAGE_SIZE = 1024 * 1024 * 1024
 LOCAL_HISTORY = [
-    {"version": VERSION, "date": "2026-09-19", "summary": "新增版本中心：历史版本、更新检查与提醒、校验下载及安装重启。"},
+    {"version": VERSION, "date": "2026-09-19", "summary": "修复 GitHub API 受限时无法检查版本，保留正式版识别和更新包校验。"},
+    {"version": "2026.09.19.2", "date": "2026-09-19", "summary": "新增版本中心：历史版本、更新检查与提醒、校验下载及安装重启。"},
     {"version": "2026.09.19.1", "date": "2026-09-19", "summary": "使用 Windows DPAPI 保护凭据，完善源码启动器和启动异常日志。"},
     {"version": "2026.09.19", "date": "2026-09-19", "summary": "精简切片列表载荷，修复反复刷新引起的界面内存上涨。"},
     {"version": "2026.09.18", "date": "2026-09-18", "summary": "首个公开版本，包含直播录制、AI 切片、成片预览与队列投稿。"},
@@ -35,6 +39,10 @@ class DownloadCancelled(Exception):
 
 
 class UpdateFileError(ValueError):
+    pass
+
+
+class ReleaseUnavailable(ValueError):
     pass
 
 
@@ -56,6 +64,9 @@ def trusted_url(url, asset=False):
         raise ValueError("更新地址不可信")
     allowed = host == "api.github.com" and path == f"/repos/{REPOSITORY}/releases"
     allowed |= host == "github.com" and path.startswith(f"/{REPOSITORY}/releases/download/")
+    allowed |= host == "github.com" and not parsed.query and (
+        path in {f"/{REPOSITORY}/releases/latest", f"/{REPOSITORY}/releases.atom"}
+        or re.fullmatch(rf"/{re.escape(REPOSITORY)}/releases/tag/v?\d{{1,6}}\.\d{{1,6}}\.\d{{1,6}}(?:\.\d{{1,6}})?", path) is not None)
     allowed |= asset and host == "release-assets.githubusercontent.com"
     if not allowed:
         raise ValueError("更新地址不可信")
@@ -65,24 +76,28 @@ def trusted_url(url, asset=False):
 class ReleaseRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         trusted_url(newurl, asset=True)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
+        redirected = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if redirected is not None and req.get_method() == "HEAD":
+            redirected.method = "HEAD"
+        return redirected
 
 
-def open_release(url):
+def open_release(url, method="GET"):
     trusted_url(url)
-    request = urllib.request.Request(url, headers={
+    request = urllib.request.Request(url, method=method, headers={
         "User-Agent": f"StreamClip/{VERSION}",
-        "Accept": "application/vnd.github+json" if urllib.parse.urlsplit(url).hostname == "api.github.com" else "application/octet-stream",
+        "Accept": "application/vnd.github+json" if urllib.parse.urlsplit(url).hostname == "api.github.com" else "*/*",
         "X-GitHub-Api-Version": "2022-11-28",
     })
     try:
         return urllib.request.build_opener(ReleaseRedirect()).open(request, timeout=20)
     except urllib.error.HTTPError as exc:
+        exc.close()
         if exc.code in {403, 429}:
-            raise ValueError("GitHub 请求受限，请稍后重试，或打开发布页面。") from None
-        raise ValueError(f"更新服务返回 HTTP {exc.code}，请稍后重试。") from None
-    except (OSError, urllib.error.URLError):
-        raise ValueError("无法连接 GitHub，请检查网络或代理后重试。") from None
+            raise ReleaseUnavailable("GitHub 请求受限，请稍后重试，或打开发布页面。") from None
+        raise ReleaseUnavailable(f"更新服务返回 HTTP {exc.code}，请稍后重试。") from None
+    except (OSError, urllib.error.URLError, HTTPException):
+        raise ReleaseUnavailable("无法连接 GitHub，请检查网络或代理后重试。") from None
 
 
 def release_history(remote=()):
@@ -129,11 +144,79 @@ def parse_releases(payload):
     return sorted(releases, key=lambda row: version_key(row["version"]), reverse=True)
 
 
-def fetch_releases():
-    with open_release(API_URL) as response:
-        raw = response.read(8 * 1024 * 1024 + 1)
-    if len(raw) > 8 * 1024 * 1024:
+def read_release(url, limit=8 * 1024 * 1024):
+    try:
+        with open_release(url) as response:
+            raw = response.read(limit + 1)
+    except (OSError, HTTPException):
+        raise ReleaseUnavailable("版本信息读取中断，请检查网络后重试。") from None
+    if len(raw) > limit:
         raise ValueError("版本列表过大，请打开发布页面查看。")
+    return raw
+
+
+class ReleaseNotes(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.parts = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag in {"p", "li", "br", "pre", "h1", "h2", "h3", "h4", "h5", "h6"}:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag):
+        self.handle_starttag(tag, ())
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
+def fetch_latest_release():
+    # Atom also contains prereleases; only /latest confirms a stable release.
+    with open_release(RELEASES_URL + "/latest", method="HEAD") as response:
+        url = response.geturl()
+    trusted_url(url)
+    tag = url.rsplit("/", 1)[-1]
+    version_key(tag)
+    if url != f"{RELEASES_URL}/tag/{tag}":
+        raise ValueError("无法确认最新正式版本，请打开发布页面查看。")
+    item = {"tag_name": tag, "body": "完整更新说明请查看发布页面。"}
+    try:
+        atom = "{http://www.w3.org/2005/Atom}"
+        feed = ET.fromstring(read_release(RELEASES_URL + ".atom"))
+        for entry in feed.findall(atom + "entry"):
+            if any(link.get("rel") == "alternate" and link.get("href") == url for link in entry.findall(atom + "link")):
+                notes = ReleaseNotes()
+                notes.feed(entry.findtext(atom + "content", ""))
+                notes.close()
+                item.update(body="\n".join(line.strip() for line in "".join(notes.parts).splitlines() if line.strip()),
+                            published_at=entry.findtext(atom + "updated", ""))
+                break
+    except (ValueError, ET.ParseError):
+        pass  # Notes are optional; the stable version was confirmed separately.
+    name = f"StreamClip-{tag}-windows-x64.zip"
+    asset_url = f"{RELEASES_URL}/download/{tag}/{name}"
+    try:
+        checksums = read_release(f"{RELEASES_URL}/download/{tag}/SHA256SUMS.txt", 64 * 1024).decode("utf-8-sig")
+        digests = [match[1] for line in checksums.splitlines()
+                   if (match := re.fullmatch(r"([0-9a-fA-F]{64}) [ *]" + re.escape(name), line))]
+        if len(digests) == 1:
+            with open_release(asset_url, method="HEAD") as response:
+                size = int(response.headers.get("Content-Length", ""))
+            item["assets"] = [{"name": name, "browser_download_url": asset_url,
+                               "digest": "sha256:" + digests[0], "size": size}]
+    except ValueError:
+        pass  # Missing/invalid metadata must disable installation, not discovery.
+    latest = parse_releases([item])[0]
+    latest["source"] = "release-page"
+    return [latest]
+
+
+def fetch_releases():
+    try:
+        raw = read_release(API_URL)
+    except ReleaseUnavailable:
+        return fetch_latest_release()
     try:
         payload = json.loads(raw)
     except (ValueError, UnicodeError):

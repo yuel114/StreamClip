@@ -2,6 +2,7 @@
 
 import copy
 import hashlib
+from http.client import BadStatusLine, IncompleteRead
 import io
 import json
 import os
@@ -50,6 +51,113 @@ def rejected(work, text=""):
         assert not text or text in str(exc), str(exc)
     else:
         raise AssertionError("Unsafe update operation was accepted")
+
+
+def check_public_release():
+    tag = "v2099.01.01"
+    page = f"{updates.RELEASES_URL}/tag/{tag}"
+    latest = updates.RELEASES_URL + "/latest"
+    feed_url = updates.RELEASES_URL + ".atom"
+    name = f"StreamClip-{tag}-windows-x64.zip"
+    package_url = f"{updates.RELEASES_URL}/download/{tag}/{name}"
+    checksum_url = f"{updates.RELEASES_URL}/download/{tag}/SHA256SUMS.txt"
+    feed = f"""<feed xmlns="http://www.w3.org/2005/Atom">
+        <entry><link rel="alternate" href="{updates.RELEASES_URL}/tag/v2100.01.01"/>
+        <title>Newer numeric-tag prerelease</title><content>Must not become latest</content></entry>
+        <entry><link rel="alternate" href="{page}"/><title>Not a version number</title>
+        <updated>2099-01-01T00:00:00Z</updated>
+        <content type="html">&lt;h2&gt;Release notes&lt;/h2&gt;&lt;ul&gt;
+        &lt;li&gt;Fix &amp;amp; verify&lt;/li&gt;&lt;li&gt;Preserve settings&lt;/li&gt;&lt;/ul&gt;</content></entry>
+        </feed>""".encode()
+    checksum = (("a" * 64) + f"  {name}\r\n" + ("b" * 64) + "  StreamClip/StreamClip.exe\r\n").encode()
+    routes = {latest: (b"", page, {}), feed_url: (feed, feed_url, {}),
+              checksum_url: (checksum, checksum_url, {}),
+              package_url: (b"", package_url, {"Content-Length": "512"})}
+    calls = []
+    api_error = urllib.error.HTTPError(updates.API_URL, 403, "", {}, None)
+
+    def open_request(request, timeout):
+        url, method = request.full_url, request.get_method()
+        calls.append((url, method))
+        assert timeout == 20 and not request.has_header("Authorization") and not request.has_header("Cookie")
+        if url == updates.API_URL:
+            raise api_error
+        assert method == ("HEAD" if url in {latest, package_url} else "GET"), "Checking downloaded the entire ZIP"
+        result = routes[url]
+        if isinstance(result, Exception):
+            raise result
+        raw, final_url, headers = result
+        response = io.BytesIO(raw)
+        response.geturl = lambda: final_url
+        response.headers = headers
+        return response
+
+    with patch.object(urllib.request.OpenerDirector, "open", side_effect=open_request):
+        for failure in (403, 429, 503, None):
+            calls.clear()
+            api_error = urllib.error.HTTPError(updates.API_URL, failure, "", {}, None) if failure else urllib.error.URLError("offline API")
+            rows = updates.fetch_releases()
+            assert len(rows) == 1 and rows[0]["version"] == "2099.01.01"
+            assert rows[0]["source"] == "release-page" and rows[0]["date"] == "2099-01-01"
+            assert rows[0]["notes"] == "Release notes\nFix & verify\nPreserve settings"
+            assert rows[0]["package"] == {"url": package_url, "sha256": "a" * 64, "size": 512}
+            assert calls == [(updates.API_URL, "GET"), (latest, "HEAD"), (feed_url, "GET"),
+                             (checksum_url, "GET"), (package_url, "HEAD")]
+        for bad_feed in (b"<html>offline</html>", b"<feed", b"x" * (8 * 1024 * 1024 + 1)):
+            routes[feed_url] = (bad_feed, feed_url, {})
+            row = updates.fetch_releases()[0]
+            assert row["version"] == "2099.01.01" and row["package"]
+            assert "发布页面" in row["notes"]
+        routes[feed_url] = urllib.error.URLError("offline feed")
+        assert updates.fetch_releases()[0]["package"]
+        routes[feed_url] = (feed, feed_url, {})
+        for bad_checksum in (b"<html>offline</html>", checksum * 2, checksum.replace(name.encode(), b"other.zip"),
+                             checksum.replace(b"a" * 64, b"bad-digest"), b"x" * (64 * 1024 + 1), b"\xff"):
+            calls.clear()
+            routes[checksum_url] = (bad_checksum, checksum_url, {})
+            row = updates.fetch_releases()[0]
+            assert row["version"] == "2099.01.01" and not row["package"]
+            assert (package_url, "HEAD") not in calls
+        for marker in ("  ", " *"):
+            routes[checksum_url] = ((("A" * 64) + marker + name).encode(), checksum_url, {})
+            assert updates.fetch_releases()[0]["package"]["sha256"] == "a" * 64
+        routes[checksum_url] = urllib.error.HTTPError(checksum_url, 404, "", {}, None)
+        assert not updates.fetch_releases()[0]["package"]
+        routes[checksum_url] = (checksum, checksum_url, {})
+        for size in ("", "invalid", "0", "-1", str(updates.MAX_PACKAGE_SIZE + 1)):
+            routes[package_url] = (b"", package_url, {"Content-Length": size})
+            assert not updates.fetch_releases()[0]["package"]
+        for failure in (urllib.error.URLError("offline asset"), BadStatusLine("invalid response")):
+            routes[package_url] = failure
+            assert not updates.fetch_releases()[0]["package"]
+        routes[package_url] = (b"", package_url, {"Content-Length": "512"})
+        for invalid_url in (updates.RELEASES_URL, latest, page + "?redirect=1", page + "#bad",
+                            page.replace("github.com", "evil.test"), page.replace(updates.REPOSITORY, "other/project"),
+                            page + "-beta", f"{updates.RELEASES_URL}/download/{tag}"):
+            calls.clear()
+            routes[latest] = (b"", invalid_url, {})
+            rejected(updates.fetch_releases)
+            assert len(calls) == 2, "An unconfirmed version reached metadata fetching"
+        for failure in (404, 429):
+            routes[latest] = urllib.error.HTTPError(latest, failure, "", {}, None)
+            rejected(updates.fetch_releases)
+        routes[latest] = urllib.error.URLError("offline website")
+        rejected(updates.fetch_releases, "无法连接")
+    redirect = updates.ReleaseRedirect()
+    request = urllib.request.Request(latest, method="HEAD")
+    for code in (301, 302, 303, 307, 308):
+        assert redirect.redirect_request(request, None, code, "", {}, page).get_method() == "HEAD"
+        asset_request = urllib.request.Request(package_url, method="HEAD")
+        redirected = redirect.redirect_request(asset_request, None, code, "", {}, "https://release-assets.githubusercontent.com/test")
+        assert redirected.get_method() == "HEAD"
+    rejected(lambda: redirect.redirect_request(request, None, 302, "", {}, "https://evil.test/update"))
+    for error in (TimeoutError("offline timeout"), IncompleteRead(b"partial")):
+        with patch.object(updates, "open_release", return_value=io.BytesIO()) as opener, \
+             patch.object(updates, "fetch_latest_release", return_value=[{"version": "2099.01.01"}]) as public:
+            # Exercise a body read failure after headers were already received.
+            with patch.object(opener.return_value, "read", side_effect=error):
+                assert updates.fetch_releases()[0]["version"] == "2099.01.01"
+            public.assert_called_once()
 
 
 def check_windows_installer(folder):
@@ -130,12 +238,15 @@ def run():
     rejected(lambda: redirect.redirect_request(request, None, 302, "", {}, "https://evil.test/payload"))
     response = redirect.redirect_request(request, None, 302, "", {}, "https://release-assets.githubusercontent.com/test?sig=public")
     assert response.full_url.startswith("https://release-assets.githubusercontent.com/")
-    with patch.object(updates, "open_release", return_value=io.BytesIO(json.dumps([release()]).encode())):
+    with patch.object(updates, "open_release", return_value=io.BytesIO(json.dumps([release()]).encode())) as opener:
         assert updates.fetch_releases()[0]["version"] == "2099.01.01"
-    with patch.object(updates, "open_release", return_value=io.BytesIO(b"<html>offline</html>")):
+        opener.assert_called_once_with(updates.API_URL)
+    with patch.object(updates, "open_release", return_value=io.BytesIO(b"<html>offline</html>")) as opener:
         rejected(updates.fetch_releases, "无法解析")
+        opener.assert_called_once_with(updates.API_URL)
     with patch.object(urllib.request.OpenerDirector, "open", side_effect=urllib.error.HTTPError(updates.API_URL, 403, "", {}, None)):
         rejected(lambda: updates.open_release(updates.API_URL), "请求受限")
+    check_public_release()
 
     cache = Path(os.environ.get("LIVECLIP_UI_TEST_OUTPUT", str(Path(tempfile.gettempdir()) / "StreamClip" / "update-check")))
     cache.mkdir(parents=True, exist_ok=True)
@@ -175,7 +286,7 @@ def run():
         with patch.object(updates.sys, "frozen", False, create=True):
             rejected(lambda: updates.launch_installer(staged), "源码版")
         check_windows_installer(root)
-    print("Update checks passed: release sorting, trust boundaries, cancellation, hash verification, EXE staging, real atomic replacement and rollback")
+    print("Update checks passed: API failures and public stable-release discovery, bounded metadata, trust boundaries, cancellation, hash verification, EXE staging, real atomic replacement and rollback")
 
 
 if __name__ == "__main__":
