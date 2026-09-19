@@ -403,7 +403,7 @@ class Bridge(QObject):
         workspace = self._workspace_snapshot(rooms)
         workspace["messages"] = messages
         workspace["recentTasks"] = sorted(tasks, key=lambda row: row["id"], reverse=True)[:8]
-        workspace["recentClips"] = [clip for clip in workspace["clips"] if not core.is_legacy_heuristic_clip(clip)][:8]
+        workspace["recentClips"] = workspace["clips"][:8]
         return rows, sorted(tasks, key=lambda t: t["id"], reverse=True), selected, self._detail_cache, message, workspace
 
     def _workspace_snapshot(self, room_map=None):
@@ -411,7 +411,10 @@ class Bridge(QObject):
             room_map = {str(r["room_id"]): r for r in self.db.list_rooms()}
         active = self.service.active_room_ids()
         rooms = [dict(r, id=str(r["room_id"]), status="录制中" if str(r["room_id"]) in active else "直播中" if r["live_status"] else "未开播") for r in room_map.values()]
-        clips = [dict(c, duration=core.format_seconds(c["end_time"] - c["start_time"]), state=core.STATUS_LABELS.get(c["status"], c["status"]), **media_origin(c, room_map)) for c in self.db.list_clips(-1) if not core.is_legacy_heuristic_clip(c)]
+        # QML property reads copy the entire map; keep audio timelines out of list rows.
+        clips = [{"id": c["id"], "title": c["title"], "duration": core.format_seconds(c["end_time"] - c["start_time"]),
+                  "state": core.STATUS_LABELS.get(c["status"], c["status"]), **media_origin(c, room_map)}
+                 for c in self.db.list_clips(-1) if not core.is_legacy_heuristic_clip(c)]
         uploads = [upload_row(u) for u in self.db.list_uploads()]
         accounts = [{k: a.get(k) for k in ("id", "name", "role", "enabled", "last_status")} | {"uid": core.parse_cookie(a["cookie"]).get("DedeUserID", ""), "avatar": image_data(a.get("avatar_png") or b"")} for a in self.db.list_cookie_accounts()]
         selected_clip = self._selected_clip

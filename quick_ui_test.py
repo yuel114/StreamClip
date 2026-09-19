@@ -254,6 +254,52 @@ def check_finished_recordings(application, output):
             service.stop()
 
 
+def check_lightweight_clip_rows(application, output):
+    with tempfile.TemporaryDirectory(dir=output) as folder:
+        settings = ui.core.Settings(base_dir=folder)
+        settings.ensure_dirs()
+        db = ui.core.Database(settings.data_path / "app.db")
+        service = ui.core.RecorderService(settings, db, ui.queue.Queue())
+        bridge = ui.Bridge(settings, db, service)
+        try:
+            db.add_room("901", "离线内存测试主播")
+            db.update_room_config("901", uid="77")
+            metadata = {"source_liver_uid": "77", "source_name": "离线内存测试主播",
+                        "cloud_non_speech_intervals": [{"start": i, "end": i + 0.5, "source": "offline"} for i in range(5000)]}
+            rid = db.create_recording("local", "memory", "离线长录播", "", "2026-09-19", metadata=metadata)
+            db.finish_recording(rid, "complete", "", "2026-09-19", 7200)
+            clips = []
+            for source, state in (("ai", "ready"), ("heuristic", "published"), ("heuristic", "rejected")):
+                cid = db.create_clip(rid, "离线切片 " + state, 10, 70, str(Path(folder) / (state + ".mp4")), review_status=state,
+                                     metadata={"source": source, "source_liver_uid": "999",
+                                               "reason": "保留选中切片的完整复核依据", "unused_analysis": metadata})
+                db.set_clip_status(cid, "complete")
+                clips.append(cid)
+            bridge.selectClip(clips[0])
+            wait_for(application, lambda: not bridge._refreshing)
+            expected_ids = clips[1::-1]
+            assert [r["id"] for r in bridge.clips.rows] == expected_ids, "只能隐藏已淘汰的规则草稿，历史成片必须保留"
+            for rows in (bridge.clips.rows, bridge.workspace["recentClips"]):
+                assert [r["id"] for r in rows] == expected_ids
+                assert all(r["streamerKey"] == "room:901" and r["date"] == "2026-09-19" for r in rows), "切片应继承原录播身份，不能误用切片元数据"
+                assert all(r["duration"] == "00:01:00" and r["state"] == ui.core.STATUS_LABELS["complete"] for r in rows)
+                assert all(set(r) == {"id", "title", "duration", "state", "streamerKey", "streamerName", "date"} for r in rows), "列表把完整录播/切片分析带入了 QML"
+                assert len(json.dumps(rows, ensure_ascii=False).encode("utf-8")) < 4096, "列表内存不应随音频分析元数据大小增长"
+            assert bridge.workspace["clip"]["evidence"] == "保留选中切片的完整复核依据"
+            changes = []
+            bridge.clips.dataChanged.connect(lambda *args: changes.append(True))
+            bridge.workspaceChanged.connect(lambda: changes.append(True))
+            bridge.refresh()
+            wait_for(application, lambda: not bridge._refreshing)
+            assert not changes, "未变化的数据不应重建切片界面"
+            assert json.loads(db.get_recording(rid)["metadata_json"]) == metadata, "优化不能删改原录播分析"
+            assert db.clip_review(clips[0])[2]["unused_analysis"] == metadata, "优化不能删改切片复核资料"
+        finally:
+            bridge._pool.shutdown(wait=True)
+            bridge._network.shutdown(wait=True, cancel_futures=True)
+            service.stop()
+
+
 def check_media_filters(application, bridge, window, folder, output):
     db = bridge.db
     original_records = [db.get_recording(i) for i in (1, 2)]
@@ -1409,6 +1455,7 @@ def run(motion_preference):
     qInstallMessageHandler(lambda mode, context, message: warnings.append(message))
     check_skin_preferences(output)
     check_finished_recordings(application, output)
+    check_lightweight_clip_rows(application, output)
     with tempfile.TemporaryDirectory(dir=output) as folder:
         settings = ui.core.Settings(base_dir=folder)
         settings.ensure_dirs()
