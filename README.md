@@ -4,7 +4,7 @@ Windows 桌面端 Bilibili 直播切片工作台，使用 Python、PySide6 / Qt 
 
 ## 下载
 
-Windows x64 版本见 [GitHub Releases](https://github.com/yuel114/StreamClip/releases/latest)。解压后运行 `StreamClip.exe`，无需安装 Python；FFmpeg、FFprobe 和 yt-dlp 需自行配置，见下方运行要求。
+Windows x64 版本见 [GitHub Releases](https://github.com/yuyu121704/StreamClip/releases/latest)。解压后运行 `StreamClip.exe`，无需安装 Python；FFmpeg、FFprobe 和 yt-dlp 需自行配置，见下方运行要求。
 
 升级前关闭旧程序，将新程序与已有 `data/` 放在同一目录，并保留原媒体工具及配置；不要用空数据目录覆盖已有数据。账号、录播、任务及业务设置沿用。
 
@@ -19,17 +19,29 @@ Windows x64 版本见 [GitHub Releases](https://github.com/yuel114/StreamClip/re
 
 ## 运行要求
 
-- Windows 10/11，64 位 Python 3.11。
+- Windows 10/11，x64。仅源码版需要 64 位 Python 3.11～3.13，启动脚本可自动安装。
 - 完整版 FFmpeg 和 FFprobe，需要支持 H.264/AAC、字幕、绘字以及 MP4 输出。
 - 下载 Bilibili 回放需要 yt-dlp。
 - 语音识别和 AI 分析需要用户自己的服务账号、API Key、模型权限及额度。
 - 默认封面字体依赖 Windows 的等线粗体和微软雅黑粗体；也可在设置中导入有使用授权的字体。本仓库不分发字体文件。
 
-FFmpeg、FFprobe、yt-dlp 的可执行文件不放入 Git 仓库。可以从各自上游获取，放到 `tools/ffmpeg.exe`、`tools/ffprobe.exe`、`tools/yt-dlp.exe`，或在「设置 → 高级设置 → 媒体工具」填写路径。
+FFmpeg、FFprobe、yt-dlp 的可执行文件不放入 Git 仓库。从 [FFmpeg 官方下载页的 Windows 构建入口](https://ffmpeg.org/download.html#build-windows)获取含字幕功能的完整构建，从 [yt-dlp 官方 Releases](https://github.com/yt-dlp/yt-dlp/releases)获取 `yt-dlp.exe`。将对应 EXE 放到 `tools/ffmpeg.exe`、`tools/ffprobe.exe`、`tools/yt-dlp.exe`，或在「设置 → 高级设置 → 媒体工具」填写路径并点击「检查媒体工具」。这三个媒体工具不由启动脚本自动下载；缺失不影响打开设置，但录制、转码或回放下载会受影响。
 
 ## 源码启动
 
-在项目目录打开 PowerShell：
+**首次使用源码版：完整解压到可写目录，双击 `启动Qt试运行.cmd`，首次安装时保持联网。** 不要直接在 ZIP 内运行，也不要放在需要管理员权限才能写入的目录。
+
+启动器检查 Python、pip、Tcl/Tk、SQLite、Pillow、Qt 和其他固定版本依赖；没有合适的 Python 时从 python.org 下载官方 3.13.15 x64 安装器，验证固定 SHA-256 和 Python Software Foundation 签名后按当前用户安装，不修改 PATH。随后在项目旁创建独立 `.venv`，从 PyPI 安装依赖，不改动系统 Python 的包。后续依赖完整时不重复下载；移动目录造成虚拟环境失效时保留旧环境备份再重建。
+
+检查和应用错误记录在 `data/logs/startup-日期-进程号.log`，失败会保留控制台，不再静默退出。运行期间保持控制台打开；不要同时运行 EXE 和源码版。没有网络或安装失败时不会继续启动，按日志排查网络或手动安装 [Python](https://www.python.org/downloads/windows/)（勾选 pip 与 Tcl/Tk）后重试。`.runtime` 为下载缓存，不要提交。
+
+只检查并补齐环境、不启动录制等服务：
+
+```powershell
+.\启动Qt试运行.cmd -CheckOnly
+```
+
+已安装受支持 Python 的开发者也可手动运行：
 
 ```powershell
 python -m venv .venv
@@ -48,13 +60,27 @@ python -m venv .venv
 
 术语管理入口位于「高级设置」顶部。联网查词可选，默认关闭；需要时自行配置 Brave 或 Tavily。
 
+## Key 获取
+
+**不是必须配置三条 Key。** 打开软件、扫码登录、监控录播不需要 AI Key；语音转写需要 ASR Key，自动总结与选题需要 AI Key；搜索 Key 只在启用联网查词时需要。
+
+| 用途 | 填写位置 | 获取与验证 |
+| --- | --- | --- |
+| 语音转写 | 设置 → 语音与 AI → 阿里云 ASR Key | 按[阿里云官方说明](https://help.aliyun.com/zh/model-studio/get-api-key)登录百炼，在北京地域创建并复制 Key（默认 ASR 地址是北京地域），填写后点「加载 ASR 模型」，选择模型并保存。界面也有「获取 API Key」入口。 |
+| 总结、选题和画面复核 | 同页的 AI API 地址、AI API Key | 在自己所用模型服务商的控制台创建 API Key，复制该服务商提供的 OpenAI 兼容 Base URL（一般到 `/v1`），点「连接并获取模型」，选择支持图片输入的模型后保存。Key、地址与模型须属于同一服务商和对应地域。 |
+| 可选联网查词 | 设置 → 高级设置 → 联网查词 | [Brave](https://api-dashboard.search.brave.com/documentation/guides/authentication)：在控制台开通相应计划，在 API Keys 创建 Key；或 [Tavily](https://docs.tavily.com/documentation/quickstart)：登录控制台后从 API Keys 获取。二选一即可，不用搜索就保持关闭。 |
+
+模型列表加载成功仅表示接口可访问，实际调用还需模型权限和可用额度。不要把 Bilibili Cookie 当成 API Key，Bilibili 只需在「账号」扫码。不要把真实 Key 放在截图、命令行、Issue 或仓库中。
+
 **自动处理默认开启，投稿默认私密。** AI 画面复核不通过的切片会强制私密投稿并保留复核提醒。请自行核对账号、素材使用许可、标题和可见性，不要将自动检查当作人工审片或平台审核通过的保证。
 
 ## 数据与隐私
 
 运行数据默认在程序旁的 `data/`，包括配置、数据库、登录凭据和日志；录播与切片可设置独立目录。不要同时启动多个实例处理同一数据目录。
 
-账号凭据、API Key、数据库、录播、字幕和日志不应提交到 Git，也不要放进 Issue。账号凭据的本地加密不等于公开备份是安全的。更换机器或程序目录后可能需要重新登录。
+API Key 与账号凭据使用 Windows 当前用户的 DPAPI 加密，不再以用户名、机器名或程序路径充当密钥。旧配置中的明文 API Key 在成功读取时原子迁移；能解密的旧 Cookie 在数据库打开时迁移，失败不清空原凭据。新格式不依赖程序目录；更换 Windows 用户或电脑后需要重新配置 Key、扫码登录。API Key 无法解密时会停止读取并保留原文件，按错误提示备份配置后清空对应字段再填写，不能降级为明文保存。升级后不要让不支持新格式的旧程序打开同一数据目录。
+
+账号凭据、API Key、数据库、录播、字幕和日志仍不应提交到 Git，也不要放进 Issue。DPAPI 不能抵御已经控制当前 Windows 账号的程序，历史配置副本、数据库备份中的旧凭据不会自动消失；曾泄露过的 Key 应在服务商控制台撤销重建，账号应重新登录，不能仅靠升级撤回泄露。
 
 转写会将音频上传到配置的 ASR 服务；AI 分析可能向配置的模型服务发送转写、弹幕、主播知识库、标题及画面抽帧。只处理有权使用并可发送至相应服务的内容，费用由所用服务收取。
 
@@ -63,17 +89,20 @@ python -m venv .venv
 测试使用隔离数据，不执行真实录制、收费 ASR / AI 调用或平台投稿。界面检查需要 Windows 桌面会话和可用的图形驱动。
 
 ```powershell
-$env:TEMP = 'E:\CodexBuildCache\StreamClip\tests'
+$testRoot = Join-Path $env:LOCALAPPDATA 'StreamClip\tests'
+$env:TEMP = Join-Path $testRoot 'tmp'
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force $env:TEMP | Out-Null
-$env:LIVECLIP_UI_TEST_OUTPUT = 'E:\CodexBuildCache\StreamClip\ui-check'
+$env:LIVECLIP_UI_TEST_OUTPUT = Join-Path $testRoot 'ui-check'
 $env:LIVECLIP_TEST_FFMPEG = (Resolve-Path .\tools\ffmpeg.exe).Path
 .\.venv\Scripts\python.exe -X utf8 -B release_check.py
+powershell -NoProfile -ExecutionPolicy Bypass -File .\startup_test.ps1
+.\.venv\Scripts\python.exe -X utf8 -B security_test.py
 .\.venv\Scripts\python.exe -X utf8 -B self_test.py
 .\.venv\Scripts\python.exe -X utf8 -B quick_ui_test.py
 ```
 
-路径可以替换为自己的隔离测试目录。修改后先暂存已审查的文件，再运行 `release_check.py`。发布检查扫描 Git 将跟踪的文件，验证文档、许可证和资源完整性；它不能替代完整的安全审计。
+路径可以替换为自己的隔离测试目录。修改后先暂存已审查的文件，再运行 `release_check.py`。发布检查扫描 Git 将跟踪的文件，包括二进制中的可见字符串和 UTF-16 字符串，验证文档、许可证和资源完整性；它不解压压缩包，不扫描 Git 历史，也不能替代完整的安全审计。启动器离线测试模拟缺 Python、缺包、安装失败、旧环境失效、重复启动和应用异常，不实际安装软件。
 
 ## 构建
 
@@ -81,8 +110,9 @@ $env:LIVECLIP_TEST_FFMPEG = (Resolve-Path .\tools\ffmpeg.exe).Path
 
 ```powershell
 $env:PATH = "$PWD\.venv\Scripts;$env:PATH"
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
 $env:LIVECLIP_TEST_FFMPEG = (Resolve-Path .\tools\ffmpeg.exe).Path
-.\build.ps1 -BuildRoot 'E:\CodexBuildCache\StreamClip\release'
+.\build.ps1 -BuildRoot (Join-Path $env:LOCALAPPDATA 'StreamClip\release')
 ```
 
 `-BuildRoot` 可指定其他有写入权限的构建目录；不要指向源码或数据目录。脚本先构建、逐字节验证包内 QML 和图片资源，再运行打包后的业务和界面自检；全部成功且当前程序未运行时，才备份并替换项目根目录的 `StreamClip.exe`。它不会停止正在录制的进程。请勿直接分发未通过检查的 EXE。

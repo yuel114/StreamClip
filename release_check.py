@@ -10,7 +10,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parent
 PRIVATE_PARTS = {
     "data", "references", ".learnings", ".impeccable", ".claude", ".codex",
-    ".venv", "venv", "env", "node_modules", "__pycache__", "build", "dist",
+    ".venv", ".runtime", "venv", "env", "node_modules", "__pycache__", "build", "dist",
 }
 PRIVATE_NAMES = {
     "config.json", "appearance.json", "当前会话工作报告.md", "高光选题与文案复核.md",
@@ -30,7 +30,8 @@ PATTERNS = {
         rb"\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{25,}"
         rb"|github_pat_[A-Za-z0-9_]{30,}|AKIA[A-Z0-9]{16})\b"
     ),
-    "personal-home-path": re.compile(rb"(?i)[A-Z]:[\\/]+Users[\\/]+[A-Za-z0-9_.-]+"),
+    "personal-home-path": re.compile(rb"""(?i)[A-Z]:[\\/]+Users[\\/]+[^\s\\/"'<>|\x00]+"""),
+    "developer-cache-path": re.compile(rb"(?i)[A-Z]:[\\/]+CodexBuildCache(?:[\\/]|$)"),
     "personal-email": re.compile(rb"\b[0-9]{5,}@qq\.com\b"),
 }
 
@@ -40,6 +41,7 @@ def problems(name: str, content: bytes) -> list[str]:
     result = []
     if (
         any(part in PRIVATE_PARTS for part in path.parts)
+        or any(part.startswith(".venv.before-") for part in path.parts)
         or path.name in PRIVATE_NAMES
         or path.suffix in PRIVATE_SUFFIXES
         or (path.name.startswith(".env") and path.name != ".env.example")
@@ -51,8 +53,10 @@ def problems(name: str, content: bytes) -> list[str]:
         result.append("large-git-blob")
     if path.parent == PurePosixPath("assets/ui") and path.name in RETIRED_ART:
         result.append("retired-artwork")
-    if b"\0" not in content[:8192]:
-        result.extend(label for label, pattern in PATTERNS.items() if pattern.search(content))
+    # Inspect binary payloads too; remove NUL interleaving to catch UTF-16
+    # strings without treating a binary header as permission to skip scanning.
+    views = (content, content.replace(b"\0", b""))
+    result.extend(label for label, pattern in PATTERNS.items() if any(pattern.search(view) for view in views))
     return result
 
 
@@ -61,6 +65,7 @@ def check_rules() -> None:
         "data/config.json", "backup/app.db-wal", ".env", ".env.local",
         ".learnings/ERRORS.md", "tools/ffmpeg.exe", "session-cookies.txt",
         "当前会话工作报告.md",
+        ".runtime/python-install.log", ".venv.before-old/pyvenv.cfg",
     ):
         assert problems(name, b"") == ["private-or-generated-file"], name
     for name in ("app.py", ".env.example", "assets/ui/art-provenance.json", "LICENSE"):
@@ -69,9 +74,16 @@ def check_rules() -> None:
         assert problems("assets/ui/" + name, b"") == ["retired-artwork"], name
     assert problems("app.py", ("ghp_" + "a" * 30).encode()) == ["service-token"]
     assert problems("notes.md", ("E:" + "/Users/private/file").encode()) == ["personal-home-path"]
+    assert problems("notes.md", ("D:" + "/Users/测试用户/file").encode()) == ["personal-home-path"]
+    assert problems("notes.md", ("E:" + "/CodexBuildCache/build").encode()) == ["developer-cache-path"]
     assert problems("notes.md", ("123456789" + "@qq.com").encode()) == ["personal-email"]
     assert problems("key.txt", ("-----BEGIN " + "PRIVATE KEY-----").encode()) == ["private-key"]
     assert not problems("test.py", b"api_key='offline-test-key'")
+    token = "ghp_" + "a" * 30
+    for data in (b"\0" + token.encode(), b"\0" * 9000 + token.encode(),
+                 token.encode("utf-16-le"), token.encode("utf-16-be")):
+        assert problems("asset.bin", data) == ["service-token"]
+    assert not problems("asset.bin", b"\0" * 9000 + b"ordinary binary asset")
 
 
 def check_release() -> None:

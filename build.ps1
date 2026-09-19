@@ -1,5 +1,5 @@
 param(
-    [string]$BuildRoot = 'E:\CodexBuildCache\StreamClip'
+    [string]$BuildRoot = (Join-Path $env:LOCALAPPDATA 'StreamClip\build')
 )
 
 $ErrorActionPreference = 'Stop'

@@ -1963,6 +1963,11 @@ def assert_bilibili_account_setup() -> None:
 def assert_packaging_collects_ttkbootstrap_assets() -> None:
     """Keep both the Qt frontend and legacy regression resources in the build."""
     project_root = Path(__file__).resolve().parent
+    requirements = (project_root / "requirements.txt").read_text(encoding="utf-8")
+    assert requirements.splitlines()[0] == "# coding: utf-8", "pip on Chinese Windows must not decode requirements as GBK"
+    pins = dict(line.split("==") for line in requirements.splitlines() if line.strip() and not line.startswith("#"))
+    assert set(pins) == {"Pillow", "ttkbootstrap", "PySide6", "qrcode"}
+    assert all(re.fullmatch(r"\d+\.\d+(?:\.\d+)?", value) for value in pins.values())
     build_script = (project_root / "build.ps1").read_text(encoding="utf-8")
     assert app.APP_NAME == "StreamClip"
     assert f"$appName = '{app.APP_NAME}'" in build_script

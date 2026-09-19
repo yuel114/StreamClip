@@ -354,31 +354,48 @@ def validate_cover(path: Path | None) -> None:
 
 
 def _local_secret_key() -> bytes:
-    """Derive a per-user key for protecting locally stored Cookie values.
-
-    This is deliberately a small standard-library vault.  On Windows the
-    application directory and user/machine identity make the ciphertext
-    non-portable; callers should still treat the data directory as sensitive.
-    """
+    """Legacy v1 reader only; public machine/user names are NOT a secret."""
     seed = "|".join((getpass.getuser(), platform.node(), str(runtime_root()))).encode("utf-8", "replace")
     return hashlib.sha256(seed).digest()
 
 
-def encrypt_cookie(value: str) -> str:
-    """Return authenticated local ciphertext; empty values stay empty."""
+def _dpapi(data: bytes, *, decrypt: bool = False) -> bytes:
+    """Use the current Windows user's protected key, never a derived password."""
+    if os.name != "nt":
+        raise RuntimeError("凭证保护需要 Windows 10/11，未保存任何明文凭证。")
+    import ctypes
+
+    class Blob(ctypes.Structure):
+        _fields_ = [("size", ctypes.c_uint32), ("data", ctypes.c_void_p)]
+
+    crypt32 = ctypes.WinDLL("crypt32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    operation = crypt32.CryptUnprotectData if decrypt else crypt32.CryptProtectData
+    operation.argtypes = [ctypes.POINTER(Blob), ctypes.c_void_p, ctypes.POINTER(Blob),
+                          ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32, ctypes.POINTER(Blob)]
+    operation.restype = ctypes.c_int
+    kernel32.LocalFree.argtypes = [ctypes.c_void_p]
+    kernel32.LocalFree.restype = ctypes.c_void_p
+    buffer = ctypes.create_string_buffer(data)
+    source = Blob(len(data), ctypes.cast(buffer, ctypes.c_void_p))
+    result = Blob()
+    # CRYPTPROTECT_UI_FORBIDDEN; deliberately omit CRYPTPROTECT_LOCAL_MACHINE.
+    if not operation(ctypes.byref(source), None, None, None, None, 1, ctypes.byref(result)):
+        raise OSError(ctypes.get_last_error(), "Windows 凭证保护失败")
+    try:
+        return ctypes.string_at(result.data, result.size)
+    finally:
+        kernel32.LocalFree(result.data)
+
+
+def encrypt_secret(value: str) -> str:
+    """Protect API keys and login credentials without a plaintext fallback."""
     plain = str(value or "").encode("utf-8")
-    if not plain:
-        return ""
-    nonce = os.urandom(16)
-    key = _local_secret_key()
-    stream = bytearray()
-    counter = 0
-    while len(stream) < len(plain):
-        stream.extend(hashlib.sha256(key + nonce + counter.to_bytes(4, "big")).digest())
-        counter += 1
-    cipher = bytes(left ^ right for left, right in zip(plain, stream))
-    tag = hmac.new(key, nonce + cipher, hashlib.sha256).digest()[:16]
-    return "v1:" + base64.urlsafe_b64encode(nonce + cipher + tag).decode("ascii")
+    return "dpapi:" + base64.b64encode(_dpapi(plain)).decode("ascii") if plain else ""
+
+
+def encrypt_cookie(value: str) -> str:
+    return encrypt_secret(value)
 
 
 def decrypt_cookie(value: str) -> str:
@@ -386,6 +403,11 @@ def decrypt_cookie(value: str) -> str:
     text = str(value or "")
     if not text:
         return ""
+    if text.startswith("dpapi:"):
+        try:
+            return _dpapi(base64.b64decode(text[6:], validate=True), decrypt=True).decode("utf-8")
+        except (OSError, RuntimeError, ValueError, UnicodeDecodeError):
+            return ""
     if not text.startswith("v1:"):
         # A legacy account may have been stored as plain text.  The migration
         # path accepts it once and callers can rewrite it encrypted.
@@ -1480,6 +1502,9 @@ def export_static_recap_bundle(
     return stream_dir
 
 
+SECRET_SETTING_FIELDS = ("dashscope_api_key", "llm_api_key", "brave_api_key", "tavily_api_key")
+
+
 @dataclass
 class Settings:
     # 11 = automatic publishing metadata; legacy default_* fields are ignored
@@ -1593,6 +1618,7 @@ class Settings:
     @classmethod
     def load(cls, path: Path) -> "Settings":
         values: dict[str, Any] = {}
+        loaded: Any = {}
         legacy_config = True
         if path.exists():
             try:
@@ -1608,6 +1634,18 @@ class Settings:
                     legacy_config = not any(key in loaded for key in ("dashscope_model", "dashscope_api_key_env", "dashscope_asr_url"))
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 values = {}
+        for name in SECRET_SETTING_FIELDS:
+            value = str(values.get(name) or "")
+            if value.startswith("dpapi:"):
+                try:
+                    values[name] = _dpapi(base64.b64decode(value[6:], validate=True), decrypt=True).decode("utf-8")
+                    if not values[name]:
+                        raise ValueError("empty protected key")
+                except (OSError, RuntimeError, ValueError, UnicodeDecodeError):
+                    raise RuntimeError(
+                        f"无法解密 {name}。请使用保存它的 Windows 用户和电脑，"
+                        "或备份配置后清空该字段并重新填写 Key；原配置未修改。"
+                    ) from None
         settings = cls(**values)
         # The first versions of this app wrote transcription_provider=local.
         # Treat that value as a legacy default when no DashScope settings exist
@@ -1789,6 +1827,16 @@ class Settings:
         settings.mcp_max_tool_rounds = max(1, min(20, integer(settings.mcp_max_tool_rounds, 5)))
         for name in ("brave_api_key", "brave_api_key_env", "tavily_api_key", "tavily_api_key_env"):
             setattr(settings, name, str(getattr(settings, name) or "").strip())
+        if isinstance(loaded, dict):
+            legacy_keys = [name for name in SECRET_SETTING_FIELDS
+                           if loaded.get(name) and not str(loaded[name]).startswith("dpapi:")]
+            if legacy_keys:
+                # Migrate only the secrets, preserving unknown fields and all
+                # other original values. Encryption must finish before writing.
+                migrated = dict(loaded)
+                for name in legacy_keys:
+                    migrated[name] = encrypt_secret(getattr(settings, name))
+                write_json_atomic(path, migrated)
         return settings
 
     def ensure_dirs(self) -> None:
@@ -1804,10 +1852,12 @@ class Settings:
         self.publish_visibility = normalize_publish_visibility(self.publish_visibility)
         self.auto_submit = bool(self.auto_slice)
         payload = asdict(self)
+        for name in SECRET_SETTING_FIELDS:
+            payload[name] = encrypt_secret(getattr(self, name))
         # Keep the runtime value available to workers/UI while avoiding a
         # plaintext Cookie in config.json.  Older config files are migrated on
         # the first save; the encrypted value is machine/user-bound.
-        payload["bili_cookie_ciphertext"] = encrypt_cookie(self.bili_cookie)
+        payload["bili_cookie_ciphertext"] = encrypt_cookie(self.bili_cookie) if self.bili_cookie else self.bili_cookie_ciphertext
         payload["bili_cookie"] = ""
         write_json_atomic(path, payload)
 
@@ -2063,6 +2113,17 @@ class Database:
                 for column, definition in wanted.items():
                     if column not in columns:
                         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+            # Upgrade only readable legacy credentials; never overwrite an
+            # unreadable account or change its identity/status during migration.
+            # Clear replaced cells as DPAPI blobs may move to larger pages.
+            conn.execute("PRAGMA secure_delete=ON")
+            for row in conn.execute("SELECT id,cookie_ciphertext FROM cookie_accounts").fetchall():
+                old = str(row["cookie_ciphertext"] or "")
+                if old and not old.startswith("dpapi:"):
+                    cookie = decrypt_cookie(old)
+                    if cookie:
+                        conn.execute("UPDATE cookie_accounts SET cookie_ciphertext=? WHERE id=?",
+                                     (encrypt_cookie(cookie), row["id"]))
 
     @staticmethod
     def _rows(cursor: sqlite3.Cursor) -> list[dict[str, Any]]:
@@ -12509,6 +12570,8 @@ class DesktopApp:
 
 
 def run_self_test() -> None:
+    from security_test import run as check_credential_protection
+    check_credential_protection()
     from danmaku_test import run as check_danmaku_connection
     check_danmaku_connection()
     resource_dir = Path(__file__).resolve().parent
@@ -12633,7 +12696,7 @@ def run_self_test() -> None:
     else:
         raise AssertionError("non-Bilibili replay URL accepted")
     protected = encrypt_cookie("SESSDATA=test; bili_jct=csrf")
-    assert protected.startswith("v1:") and "SESSDATA" not in protected
+    assert protected.startswith("dpapi:") and "SESSDATA" not in protected
     assert decrypt_cookie(protected) == "SESSDATA=test; bili_jct=csrf"
     assert "SESSDATA\ttest" in cookie_to_netscape("SESSDATA=test; bili_jct=csrf")
     with tempfile.TemporaryDirectory(prefix="liveclip-config-secret-") as folder:
@@ -12649,6 +12712,8 @@ def run_self_test() -> None:
         secret_settings.publish_account_id = 9
         secret_settings.dashscope_api_key = "offline-asr-key"
         secret_settings.llm_api_key = "offline-ai-key"
+        secret_settings.brave_api_key = "offline-brave-key"
+        secret_settings.tavily_api_key = "offline-tavily-key"
         secret_settings.candidate_top_fraction = 0.4
         secret_settings.recordings_dir = str(Path(folder) / "recorded-media")
         secret_settings.clips_dir = str(Path(folder) / "published-clips")
@@ -12656,7 +12721,11 @@ def run_self_test() -> None:
         secret_settings.save(config_path)
         raw_config = config_path.read_text(encoding="utf-8")
         assert '"bili_cookie": ""' in raw_config and "SESSDATA=private" not in raw_config
+        for name in SECRET_SETTING_FIELDS:
+            assert getattr(secret_settings, name) not in raw_config
+            assert json.loads(raw_config)[name].startswith("dpapi:")
         loaded_settings = Settings.load(config_path)
+        assert all(getattr(loaded_settings, name) == getattr(secret_settings, name) for name in SECRET_SETTING_FIELDS)
         assert loaded_settings.bili_cookie == "SESSDATA=private; bili_jct=csrf"
         assert loaded_settings.settings_version == 11 and loaded_settings.render_font_name == "Arial"
         assert loaded_settings.subtitle_color == "#123456" and loaded_settings.cover_position == "bottom_center"
@@ -13530,8 +13599,22 @@ def main() -> None:
             report.write_text(traceback.format_exc(), encoding="utf-8")
             raise SystemExit(1)
         return
-    from quick_ui import run
-    run()
+    try:
+        from quick_ui import run
+        run()
+    except Exception as exc:
+        import traceback
+        report = runtime_root() / "data" / "logs" / "startup-error.log"
+        try:
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text(traceback.format_exc(), encoding="utf-8")
+            detail = f"启动失败：{exc}\n\n详细日志：{report}"
+        except OSError:
+            detail = f"启动失败：{exc}\n\n日志无法写入，请确认程序目录可写。"
+        if getattr(sys, "frozen", False) and os.name == "nt":
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, detail, APP_NAME, 0x10)
+        raise
 
 
 if __name__ == "__main__":
